@@ -184,6 +184,11 @@ export const CommunityPanel = () => {
     }
   };
 
+  const demoCommunities: Community[] = [
+    { id: "community-1", name: "Pearl Ring", color: "#22d3ee", memberCount: 12 },
+    { id: "community-2", name: "Deep Current", color: "#38bdf8", memberCount: 7 },
+  ];
+
   const communityStats: CommunityStatsRow[] = useMemo(() => {
     const byComm = new Map<string, { name: string; color: string; kills: number; deaths: number; deathsFromLobsters: number; deathsFromOctopuses: number; shrimp: number }>();
     for (const comm of tankCommunities) {
@@ -217,7 +222,7 @@ export const CommunityPanel = () => {
   }, [tankCommunities, tankLobsters]);
 
   const list = useMemo(() => {
-    const fromApi = communities;
+    const fromApi = communities.length > 0 ? communities : demoCommunities;
     const merged = new Map<string, Community & { memberCount: number }>();
     for (const c of fromApi) {
       const stats = communityStats.find((s) => s.id === c.id);

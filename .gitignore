@@ -12,3 +12,6 @@ Thumbs.db
 
 # Dependencies and build (lobster-tank has its own)
 node_modules/
+lobster-tank/node_modules/
+lobster-tank/.next/
+.next/
