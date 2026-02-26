@@ -148,6 +148,7 @@ VALUES ('tank-2', 'Deep Reef', 120, NOW(), NOW());
 
 | Problem | Fix |
 |---|---|
+| **404 NOT_FOUND on production URL** | Root Directory = `lobster-tank`. Deployments → latest → Promote to Production, or Redeploy with "Clear cache and redeploy". |
 | "Database not configured" | Check DATABASE_URL is set in Vercel env vars, redeploy |
 | "HELIUS_API_KEY is required" | Add HELIUS_API_KEY to Vercel env vars |
 | Lobsters not showing | Run reset-for-launch.sql to ensure "global" aquarium exists |
