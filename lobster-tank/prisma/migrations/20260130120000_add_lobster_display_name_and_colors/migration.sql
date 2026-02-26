@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Lobster" ADD COLUMN IF NOT EXISTS "displayName" TEXT;
+ALTER TABLE "Lobster" ADD COLUMN IF NOT EXISTS "bodyColor" TEXT;
+ALTER TABLE "Lobster" ADD COLUMN IF NOT EXISTS "clawColor" TEXT;

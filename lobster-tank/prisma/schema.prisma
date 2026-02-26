@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String     @id
+  twitterId     String?    @unique
+  handle        String?
+  avatar        String?
+  walletAddress String?
+  /** Hashed password set once on first auth; used to unlock caretaker/owner actions. */
+  passwordHash  String?
+  lobsters      Lobster[]
+  petEvents     PetEvent[]
+  feedEvents    FeedEvent[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Lobster {
+  id           String     @id
+  ownerUserId  String
+  aquariumId   String     @default("global")
+  level        Int        @default(1)
+  xp           Int        @default(0)
+  size         Float      @default(1)
+  wins         Int        @default(0)
+  losses       Int        @default(0)
+  traits       Json?
+  status       String     @default("Neutral")
+  communityId  String?
+  leftCommunityAt DateTime?
+  lastFed      DateTime?
+  lastPet      DateTime?
+  /** When set, this lobster has a temporary combat probability boost until this time (from verified token send + pet). */
+  petBoostUntil DateTime?
+  /** User-chosen display name (e.g. after claim). */
+  displayName  String?
+  /** Hex color for body (e.g. #c85c42). */
+  bodyColor    String?
+  /** Hex color for claws. */
+  clawColor    String?
+  /** Hex color for bandana (override when no community). */
+  bandanaColor String?
+  /** Level-up stats (user chooses one per level). */
+  maxHp              Int     @default(100)
+  attackDamage       Int     @default(10)
+  friendshipChance   Float   @default(0.2)
+  attackHitChance    Float   @default(0.8)
+  critChance         Float   @default(0.05)
+  /** When set, user must choose a stat to improve for this level (from level-up event). */
+  pendingLevelUpLevel Int?
+  /** Prepaid feeds from verified token sends (e.g. 1000 tokens = 10 credits; use 1 per feed). */
+  feedCredits  Int        @default(0)
+  owner        User       @relation(fields: [ownerUserId], references: [id])
+  aquarium     Aquarium   @relation(fields: [aquariumId], references: [id])
+  community    Community? @relation(fields: [communityId], references: [id])
+  petEvents    PetEvent[]
+  feedEvents   FeedEvent[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Aquarium {
+  id          String    @id
+  name        String
+  maxLobsters Int       @default(120)
+  description String?
+  lobsters    Lobster[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Community {
+  id          String    @id
+  name        String
+  color       String
+  description String?
+  lobsters    Lobster[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model FeedEvent {
+  id         String   @id
+  userId     String
+  lobsterId  String
+  txHash     String   @unique
+  amount     Float
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  lobster    Lobster  @relation(fields: [lobsterId], references: [id])
+}
+
+model PetEvent {
+  id         String   @id
+  userId     String
+  lobsterId  String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  lobster    Lobster  @relation(fields: [lobsterId], references: [id])
+}
+
+model TankEvent {
+  id         String   @id
+  type       String
+  payload    Json
+  createdAt  DateTime @default(now())
+}
+
+model TankSnapshot {
+  id         String   @id @default("global")
+  aquariumId String   @default("global") @unique
+  state      Json
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+}
+
+/** AI-generated 10-minute story summaries; listed in the Posts section below the feed. */
+model NarratorPost {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+/** Dedupe instant-respawn by tx hash (replay protection). */
+model InstantRespawnEvent {
+  id        String   @id
+  userId    String
+  lobsterId String
+  txHash    String   @unique
+  createdAt DateTime @default(now())
+}

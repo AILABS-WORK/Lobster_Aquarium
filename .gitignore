@@ -1,0 +1,14 @@
+# Env and secrets — never commit
+.env
+.env.local
+.env.*.local
+*.pem
+
+# OS and editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Dependencies and build (lobster-tank has its own)
+node_modules/
