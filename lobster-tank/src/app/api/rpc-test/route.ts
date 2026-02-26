@@ -5,8 +5,12 @@ import { getSolanaRpcUrl } from "@/lib/env";
 /**
  * GET /api/rpc-test
  * Verifies Helius RPC is reachable. Does not expose API keys.
+ * Disabled in production to avoid unnecessary info disclosure.
  */
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return new Response(null, { status: 404 });
+  }
   try {
     const url = getSolanaRpcUrl();
     const connection = new Connection(url, "confirmed");

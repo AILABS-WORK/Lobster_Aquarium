@@ -1,8 +1,6 @@
-# Lobster Tank
+Lobster Tank is a Next.js app with a Canvas-based aquarium simulation and AI narration. This README covers local setup, env vars, and deployment.
 
-Next.js app: live aquarium simulation, Solana (Helius), Postgres. Players claim lobsters, feed and pet them, form communities, and compete.
-
-## Getting started
+## Getting Started
 
 ```bash
 npm install
@@ -12,36 +10,41 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Environment variables
+## Environment Variables
 
-See `.env.example` for all keys. Copy it to `.env` and fill in values.
+Copy `.env.example` to `.env` and fill in values. See `.env.example` for comments.
 
-**Required for production:**
+**Required for production:** `DATABASE_URL`, `HELIUS_API_KEY`, `TANK_BANK_ADDRESS`, `TOKEN_MINT`, `AUTH_SECRET`.
 
-- `HELIUS_API_KEY` — Helius RPC (server-side Solana). Get from [Helius](https://dashboard.helius.dev/).
-- `DATABASE_URL` — Postgres connection string (Prisma).
-- `AUTH_SECRET` — Secret for password hashing (min 32 chars).
-- `TANK_BANK_ADDRESS` — Solana wallet that receives feed tokens.
-- `TOKEN_MINT` — SPL token mint address for your lobster token.
+**Production security (leave unset):**
+- Do **not** set `DEV_OWNER_WALLET` or `NEXT_PUBLIC_DEV_OWNER_WALLET` in production (dev bypass).
+- Do **not** set `NEXT_PUBLIC_SHOW_RESET_TANK=true` in production (allows public tank reset).
 
-**Security (production):**
+### Feeding
 
-- Never commit `.env` or real API keys.
-- Set `CRON_SECRET` and use it for cron / internal API calls (e.g. tank reset).
-- Do **not** set `NEXT_PUBLIC_SHOW_RESET_TANK=true` in production (testing only).
-- Do not set `DEV_OWNER_WALLET` / `NEXT_PUBLIC_DEV_OWNER_WALLET` unless you need a dev bypass.
+- Token-to-food: 100 tokens = 1 feed (configurable via `TOKEN_FEED_MIN`). Stored and applied in `/api/feed/verify`.
+- Optional `PUM_TOKEN_MINT`: accept a test token for feed verify alongside `TOKEN_MINT`.
 
-## Database
+## Notes
 
-```bash
-npx prisma generate
-npx prisma migrate deploy
-```
+- `src/lib/env.ts` validates server env; `src/lib/public-env.ts` validates `NEXT_PUBLIC_*` (exposed to the browser).
 
-## Deploy
+## Deployment
 
-Deploy the `lobster-tank` folder to Vercel (or any Node host). Add all env vars from `.env.example`. Run Prisma migrations against your Postgres database.
+- Deploy the `lobster-tank` folder to Vercel (or any Node host).
+- Set all required env vars in the host dashboard. Run Prisma migrations against your Postgres database: `npx prisma migrate deploy`.
 
-## License
+## Learn More
 
-See repository license.
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

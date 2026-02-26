@@ -703,7 +703,8 @@ export function tickTankV2(
     const baseSpeed = speedForLevel(l.level ?? 1) * (l.speedMult ?? 1);
     const speed = boostActive ? baseSpeed * PET_SPEED_MULT : baseSpeed;
 
-    if (process.env.NODE_ENV === "development" && l === aliveLobsters[0] && simTime % 1000 < cappedDelta) {
+    // Verbose sim logging only in development (avoid leaking internal state in production)
+    if (typeof process !== "undefined" && process.env.NODE_ENV === "development" && l === aliveLobsters[0] && simTime % 1000 < cappedDelta) {
       const nearPred = predators.length > 0
         ? Math.min(...predators.map(p => dist3D(l.position.x, l.position.y, l.elevation ?? 0, p.position.x, p.position.y, p.elevation ?? 0))).toFixed(0)
         : "none";

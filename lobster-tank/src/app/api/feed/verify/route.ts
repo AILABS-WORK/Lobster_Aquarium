@@ -41,8 +41,9 @@ export async function POST(request: Request) {
         { status: 429 },
       );
     }
+    const isDev = process.env.NODE_ENV === "development";
     return NextResponse.json(
-      { error: "Feed verification failed.", detail: message },
+      { error: "Feed verification failed.", ...(isDev && { detail: message }) },
       { status: 500 },
     );
   }
