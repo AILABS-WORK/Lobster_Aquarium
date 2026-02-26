@@ -1,4 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,7 +11,9 @@ const bodySchema = z.object({
   description: z.string().max(200).optional(),
 });
 
-async function ensureGlobalAquarium(db: PrismaClient) {
+type DbClient = NonNullable<ReturnType<typeof getPrisma>>;
+
+async function ensureGlobalAquarium(db: DbClient) {
   const existing = await db.aquarium.findUnique({ where: { id: "global" } });
   if (existing) return existing;
   return db.aquarium.create({

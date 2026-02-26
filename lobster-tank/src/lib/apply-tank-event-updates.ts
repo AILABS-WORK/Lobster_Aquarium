@@ -3,14 +3,14 @@
  * Used by POST /api/tank-events and by server-sim when persisting events so
  * leaderboards and DB stay in sync with sim activity.
  */
-import type { PrismaClient } from "@prisma/client";
-
 const tierAquariums = [
   { id: "tier-2", name: "Tier II Reef", minLevel: 5, maxLobsters: 160 },
   { id: "tier-3", name: "Tier III Abyss", minLevel: 10, maxLobsters: 200 },
 ];
 
-type DbClient = Pick<PrismaClient, "aquarium" | "lobster">;
+// Minimal structural type for the transaction client used here.
+// We intentionally keep this loose to avoid depending on generated Prisma types at build time.
+type DbClient = any;
 
 async function ensureTierAquarium(db: DbClient, id: string, name: string, maxLobsters: number) {
   await db.aquarium.upsert({
