@@ -97,19 +97,16 @@ export function OctopusMesh({
         </mesh>
       </group>
 
-      {/* Tentacles (segmented, with slight curl and suckers) */}
+      {/* Tentacles: 8 equally spaced around the mantle, pointing radially outward */}
       <group name="tentacles" position={[0, 0.02, 0]}>
         {tentacles.map((i) => {
           const angle = (i / 8) * Math.PI * 2;
 
-          // anchor ring around the mantle bottom
           const anchorR = 0.32 * headSize;
           const ax = Math.cos(angle) * anchorR;
           const az = Math.sin(angle) * anchorR;
 
-          // each tentacle has a slight unique yaw so they don't look cloned
-          const yaw = angle + (i % 2 === 0 ? 0.22 : -0.22);
-
+          const yaw = angle;
           const segments = 4;
 
           return (
@@ -125,20 +122,16 @@ export function OctopusMesh({
               {Array.from({ length: segments }, (_, s) => {
                 const t = s / (segments - 1);
 
-                // segment size tapers
                 const w = (0.22 - t * 0.09) * tentacleThickness;
                 const h = (0.14 - t * 0.07) * tentacleThickness;
                 const d = (0.18 - t * 0.07) * tentacleThickness;
 
-                // forward offset along local X
                 const x = 0.16 + t * (0.75 * tentacleLength);
-
-                // droop and curl
                 const y = -t * (0.26 * tentacleLength) - Math.sin(t * Math.PI) * 0.06 * curl;
-                const z = Math.sin(t * Math.PI * 0.9) * 0.1 * curl;
+                const z = Math.sin(t * Math.PI * 0.9) * 0.08 * curl;
 
-                const rx = -t * 0.65 * curl;
-                const rz = (i % 2 === 0 ? 1 : -1) * t * 0.26;
+                const rx = -t * 0.6 * curl;
+                const rz = t * 0.12;
 
                 return (
                   <group key={s} position={[x, y, z]} rotation={[rx, 0, rz]}>

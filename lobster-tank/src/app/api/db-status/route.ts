@@ -16,20 +16,14 @@ export async function GET() {
       await db.$queryRaw`SELECT 1`;
       return NextResponse.json({ configured: true });
     } catch (e) {
-      const isDev = process.env.NODE_ENV === "development";
       const msg = e instanceof Error ? e.message : String(e);
-      return NextResponse.json({
-        configured: false,
-        error: "query_failed",
-        ...(isDev && { detail: msg }),
-      });
+      return NextResponse.json({ configured: false, error: "query_failed", detail: msg });
     }
   }
   const { ok, errorDetail } = await pgPingWithError();
-  const isDev = process.env.NODE_ENV === "development";
   return NextResponse.json({
     configured: ok,
     error: ok ? undefined : "query_failed",
-    ...(isDev && errorDetail != null && { detail: errorDetail }),
+    detail: errorDetail,
   });
 }

@@ -79,7 +79,7 @@ function enforceStateDimensions(state: TankState, width: number, height: number)
 const TANK_BOX = [120, 80, 90] as const;
 const INNER_MARGIN_3D = 1;
 const LOBSTER_SCALE = 0.98;
-const SEAWEED_HEIGHT = 32;
+const SEAWEED_HEIGHT = 56;
 const SAND_BASE = "#e8d9bc";
 const WATER_COLOR = "#6ec9c2";
 const WATER_SURFACE = "#8de4dd";
@@ -301,65 +301,7 @@ const TankContents = ({
   const firstPersonFocusSnapshotRef = useRef<Lobster | null>(null);
   const firstPersonNearbyRef = useRef<Lobster | null>(null);
   const [contextLost, setContextLost] = useState(false);
-  const [resetting, setResetting] = useState(false);
   const { camera, gl } = useThree();
-
-  const handleResetTank = useCallback(async (emptyTank = false) => {
-    if (resetting) return;
-    setResetting(true);
-    try {
-      const q = new URLSearchParams({ aquarium: aqId });
-      if (emptyTank) q.set("empty", "1");
-      const res = await fetch(`/api/tank-reset?${q.toString()}`, { method: "POST" });
-      if (!res.ok) throw new Error("Reset failed");
-      lastResetAtRef.current = Date.now();
-      clearTankState(aqId);
-      clearTankEvents();
-      lastServerEventTimeRef.current = Date.now();
-      const stateRes = await fetch(`/api/tank-state?aquarium=${encodeURIComponent(aqId)}`, { cache: "no-store" });
-      if (!stateRes.ok) throw new Error("Fetch state failed");
-      const data = await stateRes.json();
-      if (data.lobsters && Array.isArray(data.lobsters)) {
-        const dims = getSimDimensions(1);
-        const width = data.width ?? stateRef.current.width ?? dims.width;
-        const height = data.height ?? stateRef.current.height ?? dims.height;
-        let foods = Array.isArray(data.foods) ? data.foods : stateRef.current.foods ?? [];
-        // Fallback: if server returned no shrimp after reset, seed foods so lobsters have something to seek
-        if (foods.length === 0) {
-          const fallback = createInitialTankState(data.lobsters.length, width, height, Math.random);
-          foods = fallback.foods;
-        }
-        const fresh: TankState = {
-          width,
-          height,
-          time: data.time ?? 0,
-          lobsters: data.lobsters,
-          predators: data.predators ?? stateRef.current.predators,
-          foods,
-          lastFoodSpawn: data.time ?? Date.now(),
-          communities: Array.isArray(data.communities) ? data.communities : [],
-          relationships: data.relationships ?? {},
-          communityEncounters: {},
-          communityJoinAffinity: {},
-          rivalEncounters: {},
-          friendlyEncounterCount: {},
-          lastFriendlyEncounterTime: {},
-          lostShrimpToWinner: {},
-          sameShrimpContests: {},
-          _lastShrimpContestTime: {},
-        };
-        // Ensure full 3D volume: no one stuck at bottom (elevation 0) after reset
-        ensureElevationSpread(fresh);
-        stateRef.current = fresh;
-        setTankLobsters(fresh.lobsters, undefined, fresh.communities, fresh.relationships);
-        persistTankState(fresh, fresh.lobsters.length, aqId);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setResetting(false);
-    }
-  }, [aqId, resetting]);
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -1042,43 +984,6 @@ const TankContents = ({
           Display was reset. Refresh the page to restore the tank.
         </Html>
       )}
-      {aqId === "global" && !contextLost && publicEnv.NEXT_PUBLIC_SHOW_RESET_TANK === "true" && (
-        <Html
-          position={[0, 0, 0]}
-          center
-          transform={false}
-          style={{
-            position: "fixed",
-            top: 12,
-            right: 12,
-            left: "auto",
-            bottom: "auto",
-            width: "auto",
-            height: "auto",
-            pointerEvents: "auto",
-            zIndex: 100,
-            display: "flex",
-            gap: "6px",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => handleResetTank(false)}
-            disabled={resetting}
-            className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 shadow-sm transition hover:bg-amber-100 disabled:opacity-60"
-          >
-            {resetting ? "Resetting…" : "Reset tank (testing)"}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleResetTank(true)}
-            disabled={resetting}
-            className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 shadow-sm transition hover:bg-red-100 disabled:opacity-60"
-          >
-            {resetting ? "…" : "Empty tank (testing)"}
-          </button>
-        </Html>
-      )}
       <OrbitControls
         ref={controlsRef}
         enablePan
@@ -1130,10 +1035,26 @@ const TankContents = ({
       <BottomBorder />
       <Seaweed lowPower={lowPower} />
       <Rocks />
+      <JaggedFloorScatter />
       <MergedStaticDecorations />
       <CavesAndTunnels />
       <CaveDomes />
       <BarnacleRocks />
+      <CoralFans />
+      <SeaGrassBeds />
+      <TreasureChests />
+      <SunkenAnchor />
+      <Starfish />
+      <SeaUrchins />
+      <Jellyfish />
+      <MarimoMossBalls />
+      <BrainCoral />
+      <MushroomCoral />
+      <SunkenRuins />
+      <ClamWithPearl />
+      <CrystalFormations />
+      <SandRipples />
+      <TubeWormClusters />
       <BubbleVents />
       {tankLobsters.map((lobster, index) => {
         const id = lobster.id;
@@ -1591,7 +1512,7 @@ function BottomBorder() {
   );
 }
 
-const SEAWEED_SWAY = 0.28;
+const SEAWEED_SWAY = 0.07;
 const SEAWEED_VARIANTS = [
   {
     colors: ["#2d6a4f", "#2f7a55", "#338b60"],
@@ -1649,7 +1570,7 @@ function Seaweed({ lowPower = false }: { lowPower?: boolean }) {
     <group>
       {positions.map((pos, i) => {
         const { x, z } = simToTankXZ(pos.x, pos.y);
-        const height = SEAWEED_HEIGHT - 6 + (i % 5) * 2.5;
+        const height = Math.min(SEAWEED_HEIGHT - 2 + (i % 6) * 3, TANK_BOX[1] * 0.68);
         return (
           <group
             key={i}
@@ -1667,95 +1588,196 @@ function Seaweed({ lowPower = false }: { lowPower?: boolean }) {
   );
 }
 
+function SeaweedLeaf({ position, rotation, scale, color }: { position: [number, number, number]; rotation: [number, number, number]; scale: number; color: string }) {
+  const geo = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0);
+    shape.quadraticCurveTo(0.55 * scale, 0.7 * scale, 0.25 * scale, 1.8 * scale);
+    shape.quadraticCurveTo(0, 2.1 * scale, -0.25 * scale, 1.8 * scale);
+    shape.quadraticCurveTo(-0.55 * scale, 0.7 * scale, 0, 0);
+    const g = new THREE.ShapeGeometry(shape, 6);
+    g.computeVertexNormals();
+    return g;
+  }, [scale]);
+  return (
+    <mesh position={position} rotation={rotation}>
+      <primitive object={geo} attach="geometry" />
+      <meshStandardMaterial color={color} roughness={0.75} metalness={0} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
 function SeaweedStrand({ variantIndex, height, seed }: { variantIndex: number; height: number; seed: number }) {
   const variant = SEAWEED_VARIANTS[variantIndex % SEAWEED_VARIANTS.length];
+  const mainColor = variant.colors[variantIndex % variant.colors.length];
+
   const mainCurve = useMemo(() => {
     const points: THREE.Vector3[] = [];
-    const steps = 12;
-    for (let i = 0; i <= steps; i += 1) {
+    const steps = 28;
+    const amp1 = 1.6 + Math.sin(seed) * 0.4;
+    const amp2 = 1.0 + Math.cos(seed * 1.3) * 0.3;
+    for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const y = t * height;
-      const phase = t * Math.PI * 0.6 + seed;
-      const swayAmp = 1.0 + 0.4 * Math.sin(seed * 0.7);
-      const swayX = Math.sin(phase) * swayAmp;
-      const swayZ = Math.cos(phase * 0.9 + 0.5) * swayAmp * 0.85;
+      const blend = 0.1 + t * 0.9;
+      const phase1 = t * Math.PI * 0.8 + seed;
+      const phase2 = t * Math.PI * 1.5 + seed * 0.7;
+      const swayX = (Math.sin(phase1) * amp1 + Math.sin(phase2) * amp2 * 0.5) * blend;
+      const swayZ = (Math.cos(phase1 * 0.9 + 0.7) * amp1 * 0.75 + Math.cos(phase2 * 0.85 + 0.3) * amp2 * 0.4) * blend;
       points.push(new THREE.Vector3(swayX, y, swayZ));
     }
     return new THREE.CatmullRomCurve3(points);
   }, [height, seed]);
 
-  const branchCurves = useMemo(() => {
-    const branches: THREE.CatmullRomCurve3[] = [];
-    const branchHeights = [0.4, 0.6, 0.82];
-    branchHeights.forEach((t, idx) => {
-      const baseY = height * t;
-      const dir = idx % 2 === 0 ? 1 : -1;
-      const len = height * (0.18 + (idx % 3) * 0.06);
-      const points = [
-        new THREE.Vector3(0, baseY, 0),
-        new THREE.Vector3(1.2 * dir, baseY + len * 0.5, 0.6 * dir),
-        new THREE.Vector3(2.0 * dir, baseY + len * 1.0, 1.0 * dir),
-        new THREE.Vector3(2.2 * dir, baseY + len * 1.35, 1.2 * dir),
-      ];
-      branches.push(new THREE.CatmullRomCurve3(points));
+  const sideCurves = useMemo(() => {
+    const out: { curve: THREE.CatmullRomCurve3; color: string }[] = [];
+    [0.35, 0.6, 0.82].forEach((bt, bi) => {
+      const base = mainCurve.getPointAt(bt);
+      const dir = bi % 2 === 0 ? 1 : -1;
+      const len = height * 0.15;
+      out.push({
+        curve: new THREE.CatmullRomCurve3([
+          base.clone(),
+          new THREE.Vector3(base.x + 0.6 * dir, base.y + len * 0.5, base.z + 0.3 * dir),
+          new THREE.Vector3(base.x + 1.0 * dir, base.y + len, base.z + 0.5 * dir),
+        ]),
+        color: variant.colors[(bi + 1) % variant.colors.length],
+      });
     });
-    return branches;
-  }, [height]);
+    return out;
+  }, [mainCurve, height, variant.colors]);
 
-  const mainColor = variant.colors[variantIndex % variant.colors.length];
+  const leaves = useMemo(() => {
+    const out: { pos: [number, number, number]; rot: [number, number, number]; sc: number; col: string }[] = [];
+    const leafCount = 6;
+    for (let li = 0; li < leafCount; li++) {
+      const t = 0.2 + (li / leafCount) * 0.7;
+      const pt = mainCurve.getPointAt(t);
+      const side = li % 2 === 0 ? 1 : -1;
+      out.push({
+        pos: [pt.x + side * 0.35, pt.y, pt.z + side * 0.25],
+        rot: [0.15 * side, seed + li * 0.6, 0.4 * side],
+        sc: 0.9 + (li % 3) * 0.2,
+        col: variant.colors[li % variant.colors.length],
+      });
+    }
+    return out;
+  }, [mainCurve, seed, variant.colors]);
+
   return (
     <group>
       <mesh>
-        <tubeGeometry args={[mainCurve, 28, 0.42, 7, false]} />
-        <meshStandardMaterial color={mainColor} roughness={0.9} metalness={0} />
+        <tubeGeometry args={[mainCurve, 28, 0.22, 6, false]} />
+        <meshStandardMaterial color={mainColor} roughness={0.85} metalness={0} />
       </mesh>
-      {branchCurves.map((curve, idx) => (
-        <mesh key={idx}>
-          <tubeGeometry args={[curve, 20, 0.24, 6, false]} />
-          <meshStandardMaterial color={variant.colors[(idx + 1) % variant.colors.length]} roughness={0.9} metalness={0} />
+      {sideCurves.map((b, bi) => (
+        <mesh key={bi}>
+          <tubeGeometry args={[b.curve, 12, 0.1, 4, false]} />
+          <meshStandardMaterial color={b.color} roughness={0.88} metalness={0} />
         </mesh>
       ))}
+      {leaves.map((lf, li) => (
+        <SeaweedLeaf key={li} position={lf.pos} rotation={lf.rot} scale={lf.sc} color={lf.col} />
+      ))}
+      <mesh position={[0, 0.08, 0]}>
+        <sphereGeometry args={[0.32, 6, 5]} />
+        <meshStandardMaterial color="#2a5a42" roughness={0.95} metalness={0} />
+      </mesh>
     </group>
   );
 }
 
 const ROCKS: Array<[number, number, number]> = [
-  [-18, -8, 0.9],
-  [16, 10, 0.7],
+  [-24, -20, 0.85],
+  [-24, -6, 0.7],
+  [-24, 10, 0.75],
+  [-24, 22, 0.8],
+  [24, -22, 0.75],
+  [24, -8, 0.7],
+  [24, 6, 0.8],
+  [24, 20, 0.7],
+  [-12, -26, 0.9],
+  [0, -26, 0.65],
+  [14, -26, 0.75],
+  [-16, 26, 0.7],
+  [4, 26, 0.8],
+  [20, 26, 0.65],
+  [-18, -8, 1.0],
+  [16, 10, 0.75],
   [-6, 14, 1.1],
-  [10, -12, 0.8],
-  [-20, 4, 1.0],
-  [4, -10, 0.65],
-  [20, -4, 0.85],
-  [-14, 12, 0.75],
-  [22, 14, 0.6],
-  [-22, -12, 0.7],
-  [-10, -18, 0.85],
-  [6, 18, 0.7],
-  [0, 6, 0.95],
-  [12, 2, 0.65],
-  [-6, 2, 0.6],
-  [18, -14, 0.8],
-  [-18, 16, 0.75],
-  [24, 6, 0.7],
+  [10, -12, 0.85],
+  [-20, 4, 1.05],
+  [4, -10, 0.7],
+  [20, -4, 0.9],
+  [-14, 12, 0.8],
+  [22, 14, 0.65],
+  [-22, -12, 0.75],
+  [-10, -18, 0.9],
+  [6, 18, 0.75],
+  [0, 6, 1.0],
+  [12, 2, 0.7],
+  [-6, 2, 0.65],
+  [18, -14, 0.85],
+  [-18, 16, 0.8],
+  [24, 6, 0.75],
+  [-8, -14, 0.6],
+  [8, 16, 0.6],
+  [-14, 0, 0.7],
+  [14, -6, 0.65],
+  [2, -20, 0.8],
+  [-4, 20, 0.7],
+  [18, 0, 0.6],
+  [-20, -16, 0.75],
+  [22, -18, 0.7],
 ];
 
 const ROCK_COLORS = ["#8f7b66", "#7a6b5a", "#9c8974", "#6e6052", "#a5957f"];
 
 function IrregularRockGeometry({ scale, seed }: { scale: number; seed: number }) {
   const geometry = useMemo(() => {
-    const geo = new THREE.IcosahedronGeometry(scale, 1);
+    const geo = new THREE.IcosahedronGeometry(scale, 2);
     const pos = geo.attributes.position;
+    geo.computeVertexNormals();
+    const norm = geo.attributes.normal;
+    const colors: number[] = [];
+    const baseColor = new THREE.Color(ROCK_COLORS[Math.floor(seed) % ROCK_COLORS.length]);
+    const mossColor = new THREE.Color("#4a6b4a");
+    const lichColor = new THREE.Color("#8a9a78");
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const y = pos.getY(i);
-      const z = pos.getZ(i);
-      const distort = 0.2 + Math.sin(x * seed + y * seed * 0.7 + z * seed * 0.5) * 0.3;
-      const flattenY = y < 0 ? 0.6 : 1.0;
-      pos.setX(i, x * (1 + distort * 0.4));
-      pos.setY(i, y * flattenY * (1 + distort * 0.2));
-      pos.setZ(i, z * (1 + distort * 0.35));
+      let x = pos.getX(i);
+      let y = pos.getY(i);
+      let z = pos.getZ(i);
+      const nx = norm.getX(i);
+      const ny = norm.getY(i);
+      const nz = norm.getZ(i);
+      const n1 = Math.sin(x * seed * 2.3 + y * 1.7) * Math.cos(z * seed * 1.1 + 0.5);
+      const n2 = Math.sin(x * 4.1 + z * 3.7 + seed) * 0.5;
+      const n3 = Math.cos(y * 5.3 + x * 2.1 + seed * 0.7) * 0.3;
+      const distort = 0.2 + (n1 + n2 + n3) * 0.22;
+      const flattenY = y < 0 ? 0.5 : 1.0;
+      const crackX = Math.sin(x * 10 + seed * 3) * 0.08;
+      const crackZ = Math.cos(z * 9 + seed * 2.5) * 0.08;
+      const spike = (Math.sin(i * 1.7 + seed * 5) * 0.5 + 0.5) * scale * 0.35;
+      x = x * (1 + distort * 0.5) + crackX + nx * spike;
+      y = y * flattenY * (1 + distort * 0.3) + ny * spike * 0.8;
+      z = z * (1 + distort * 0.5) + crackZ + nz * spike;
+      const faceted = Math.sin(x * 6 + seed) * 0.04 + Math.cos(z * 6 + seed * 2) * 0.04;
+      x += faceted; z += faceted;
+      pos.setXYZ(i, x, y, z);
+
+      const heightBlend = (y / scale + 1) * 0.5;
+      const noiseBlend = (n1 + 1) * 0.5;
+      const c = baseColor.clone();
+      if (heightBlend > 0.6 && noiseBlend > 0.4) {
+        c.lerp(mossColor, (heightBlend - 0.6) * 2 * noiseBlend);
+      }
+      if (noiseBlend > 0.65) {
+        c.lerp(lichColor, (noiseBlend - 0.65) * 1.5);
+      }
+      c.multiplyScalar(0.85 + n2 * 0.3);
+      colors.push(c.r, c.g, c.b);
     }
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
     pos.needsUpdate = true;
     geo.computeVertexNormals();
     return geo;
@@ -1763,50 +1785,129 @@ function IrregularRockGeometry({ scale, seed }: { scale: number; seed: number })
   return <primitive object={geometry} attach="geometry" />;
 }
 
+function RockMossClump({ x, y, z, seed }: { x: number; y: number; z: number; seed: number }) {
+  const count = 3 + Math.floor(seed % 4);
+  return (
+    <group position={[x, y, z]}>
+      {Array.from({ length: count }).map((_, i) => {
+        const angle = (i / count) * Math.PI * 2 + seed;
+        const r = 0.2 + (i % 3) * 0.1;
+        return (
+          <mesh key={i} position={[Math.cos(angle) * r, 0.05, Math.sin(angle) * r]}>
+            <sphereGeometry args={[0.12 + (i % 3) * 0.04, 6, 4]} />
+            <meshStandardMaterial color={i % 2 === 0 ? "#3d5c3d" : "#4a6a3e"} roughness={0.95} metalness={0} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
 function Rocks() {
   return (
     <group>
-      {ROCKS.map(([x, z, scale], i) => (
-        <mesh
-          key={i}
-          position={[x, sandHeightAt(x, z) + scale * 0.35, z]}
-          rotation={[Math.sin(i * 0.5) * 0.2, i * 0.6, Math.cos(i * 0.3) * 0.15]}
-        >
-          <IrregularRockGeometry scale={scale} seed={i * 1.3 + 0.5} />
-          <meshStandardMaterial
-            color={ROCK_COLORS[i % ROCK_COLORS.length]}
-            roughness={0.92}
-            metalness={0.02}
-            flatShading
-          />
-        </mesh>
-      ))}
+      {ROCKS.map(([x, z, scale], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i}>
+            <mesh
+              position={[x, yBase + scale * 0.35, z]}
+              rotation={[Math.sin(i * 0.5) * 0.2, i * 0.6, Math.cos(i * 0.3) * 0.15]}
+            >
+              <IrregularRockGeometry scale={scale} seed={i * 1.3 + 0.5} />
+              <meshStandardMaterial roughness={0.92} metalness={0.02} flatShading vertexColors />
+            </mesh>
+            {i % 2 === 0 && (
+              <RockMossClump x={x} y={yBase + scale * 0.6} z={z} seed={i * 2.1} />
+            )}
+            {i % 3 === 0 && (
+              <mesh position={[x + 0.3, yBase + scale * 0.15, z + 0.2]} rotation={[0.1, i, 0.05]}>
+                <dodecahedronGeometry args={[scale * 0.35, 1]} />
+                <meshStandardMaterial color="#6e6052" roughness={0.95} metalness={0} flatShading />
+              </mesh>
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function JaggedFloorScatter() {
+  const JAG_COLORS = ["#7a6b5a", "#6e6052", "#8a7a68", "#5a4e42", "#9c8a76", "#7e6e5e"];
+  const positions = useMemo(() => {
+    const out: Array<[number, number, number, number, number]> = [];
+    const halfX = TANK_BOX[0] / 2 - 5;
+    const halfZ = TANK_BOX[2] / 2 - 5;
+    const minDist = 2.2;
+    const placed: Array<{ x: number; z: number }> = [];
+    const seed = 12.9898;
+    const rand = (i: number, j: number) => {
+      const x = Math.sin(i * seed + j * 78.233) * 43758.5453;
+      return x - Math.floor(x);
+    };
+    let id = 0;
+    for (let pass = 0; pass < 3; pass++) {
+      const step = pass === 0 ? 4.5 : pass === 1 ? 3.2 : 2.8;
+      const scaleMin = pass === 0 ? 0.38 : pass === 1 ? 0.32 : 0.28;
+      const scaleRange = pass === 0 ? 0.42 : pass === 1 ? 0.28 : 0.22;
+      for (let xi = -halfX; xi <= halfX; xi += step) {
+        for (let zi = -halfZ; zi <= halfZ; zi += step) {
+          const jx = (rand(id, 1) * 2 - 1) * step * 0.85;
+          const jz = (rand(id, 2) * 2 - 1) * step * 0.85;
+          const px = xi + jx;
+          const pz = zi + jz;
+          const tooClose = placed.some((p) => (p.x - px) ** 2 + (p.z - pz) ** 2 < minDist ** 2);
+          if (tooClose && pass > 0) continue;
+          placed.push({ x: px, z: pz });
+          const scale = scaleMin + rand(id, 3) * scaleRange;
+          const rotY = (xi + zi + id) * 0.4;
+          const heightOff = 0.25 + rand(id, 4) * 0.55;
+          out.push([px, pz, scale, rotY, heightOff]);
+          id++;
+        }
+      }
+    }
+    return out;
+  }, []);
+
+  return (
+    <group>
+      {positions.map(([x, z, scale, rotY, heightOff], i) => {
+        const yBase = sandHeightAt(x, z);
+        const shape = i % 3;
+        const color = JAG_COLORS[i % JAG_COLORS.length];
+        const rotX = Math.sin(i * 0.7) * 0.25;
+        const rotZ = Math.cos(i * 0.9) * 0.2;
+        const y = yBase + scale * heightOff;
+        return (
+          <mesh key={i} position={[x, y, z]} rotation={[rotX, rotY, rotZ]}>
+            {shape === 0 && <tetrahedronGeometry args={[scale, 0]} />}
+            {shape === 1 && <octahedronGeometry args={[scale, 0]} />}
+            {shape === 2 && <dodecahedronGeometry args={[scale * 0.9, 0]} />}
+            <meshStandardMaterial color={color} roughness={0.95} metalness={0.02} flatShading />
+          </mesh>
+        );
+      })}
     </group>
   );
 }
 
 const PEBBLES: Array<[number, number, number]> = [
-  [-14, -4, 0.15],
-  [-6, 6, 0.18],
-  [6, 12, 0.12],
-  [14, -10, 0.2],
-  [-20, 10, 0.16],
-  [22, 4, 0.14],
-  [2, -14, 0.1],
-  [-8, 14, 0.12],
+  [-14, -4, 0.15], [-6, 6, 0.18], [6, 12, 0.12], [14, -10, 0.2],
+  [-20, 10, 0.16], [22, 4, 0.14], [2, -14, 0.1], [-8, 14, 0.12],
+  [0, 0, 0.14], [-18, -12, 0.16], [18, 14, 0.13], [-4, -8, 0.11],
+  [8, -16, 0.15], [-16, 16, 0.12], [12, -4, 0.17], [-10, 2, 0.13],
 ];
 
 function Pebbles() {
+  const PEB_COLORS = ["#9c876d", "#8a7560", "#a89878", "#907a68", "#b0a088"];
   return (
     <group>
       {PEBBLES.map(([x, z, scale], i) => (
-        <mesh
-          key={i}
-          position={[x, sandHeightAt(x, z) + scale * 0.4, z]}
-          rotation={[0, i * 0.5, 0]}
-        >
-          <icosahedronGeometry args={[scale, 0]} />
-          <meshStandardMaterial color="#9c876d" roughness={0.98} metalness={0} flatShading />
+        <mesh key={i} position={[x, sandHeightAt(x, z) + scale * 0.3, z]} rotation={[i * 0.3, i * 0.5, i * 0.2]} scale={[1, 0.6 + (i % 3) * 0.15, 1]}>
+          <dodecahedronGeometry args={[scale, 1]} />
+          <meshStandardMaterial color={PEB_COLORS[i % PEB_COLORS.length]} roughness={0.98} metalness={0} flatShading />
         </mesh>
       ))}
     </group>
@@ -1819,18 +1920,41 @@ const DRIFTWOOD: Array<[number, number, number, number]> = [
 ];
 
 function Driftwood() {
+  const BARK_COLORS = ["#8b6b4a", "#7a5c3e", "#9a7b5a", "#6e5036"];
   return (
     <group>
-      {DRIFTWOOD.map(([x, z, length, radius], i) => (
-        <mesh
-          key={i}
-          position={[x, sandHeightAt(x, z) + radius * 0.6, z]}
-          rotation={[0.2, i * 0.6, 0.1]}
-        >
-          <cylinderGeometry args={[radius, radius * 1.2, length, 6]} />
-          <meshStandardMaterial color="#8b6b4a" roughness={0.9} metalness={0} />
-        </mesh>
-      ))}
+      {DRIFTWOOD.map(([x, z, length, radius], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase + radius * 0.6, z]} rotation={[0.2, i * 0.6, 0.1]}>
+            <mesh>
+              <cylinderGeometry args={[radius * 0.85, radius * 1.1, length, 8]} />
+              <meshStandardMaterial color={BARK_COLORS[i % BARK_COLORS.length]} roughness={0.92} metalness={0} />
+            </mesh>
+            <mesh rotation={[0, 0.3, 0]}>
+              <cylinderGeometry args={[radius * 1.05, radius * 1.25, length * 0.95, 8]} />
+              <meshStandardMaterial color={BARK_COLORS[(i + 1) % BARK_COLORS.length]} roughness={0.95} metalness={0} transparent opacity={0.6} />
+            </mesh>
+            {Array.from({ length: 3 }).map((_, ki) => {
+              const ky = -length * 0.3 + ki * length * 0.3;
+              return (
+                <mesh key={`k-${ki}`} position={[radius * 0.8, ky, 0]} rotation={[0, ki * 1.2, 0]}>
+                  <sphereGeometry args={[radius * 0.35, 5, 4]} />
+                  <meshStandardMaterial color="#6e5036" roughness={0.95} metalness={0} />
+                </mesh>
+              );
+            })}
+            <mesh position={[0, length * 0.52, 0]} rotation={[0.3, 0, 0.5]}>
+              <cylinderGeometry args={[radius * 0.3, radius * 0.5, length * 0.3, 5]} />
+              <meshStandardMaterial color="#7a5c3e" roughness={0.92} metalness={0} />
+            </mesh>
+            <mesh position={[0, -length * 0.48, 0]} rotation={[-0.2, 0.5, -0.3]}>
+              <cylinderGeometry args={[radius * 0.25, radius * 0.4, length * 0.25, 5]} />
+              <meshStandardMaterial color="#7a5c3e" roughness={0.92} metalness={0} />
+            </mesh>
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1842,18 +1966,26 @@ const POTTERY_SHARDS: Array<[number, number, number]> = [
 ];
 
 function PotteryShards() {
+  const SHARD_COLORS = ["#c26d4f", "#b05d42", "#d47d5f", "#a85038"];
   return (
     <group>
-      {POTTERY_SHARDS.map(([x, z, scale], i) => (
-        <mesh
-          key={i}
-          position={[x, sandHeightAt(x, z) + scale * 0.3, z]}
-          rotation={[0.2, i * 0.5, 0.1]}
-        >
-          <tetrahedronGeometry args={[scale, 0]} />
-          <meshStandardMaterial color="#c26d4f" roughness={0.8} metalness={0.05} />
-        </mesh>
-      ))}
+      {POTTERY_SHARDS.map(([x, z, scale], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase, z]}>
+            <mesh position={[0, scale * 0.2, 0]} rotation={[0.2, i * 0.5, 0.1]}>
+              <tetrahedronGeometry args={[scale, 1]} />
+              <meshStandardMaterial color={SHARD_COLORS[i % SHARD_COLORS.length]} roughness={0.75} metalness={0.08} flatShading />
+            </mesh>
+            {Array.from({ length: 3 }).map((_, si) => (
+              <mesh key={`s-${si}`} position={[Math.sin(si + i) * 0.2, scale * 0.1, Math.cos(si + i) * 0.15]} rotation={[si * 0.3, si * 0.7, 0.4]}>
+                <tetrahedronGeometry args={[scale * 0.4, 0]} />
+                <meshStandardMaterial color={SHARD_COLORS[(si + i) % SHARD_COLORS.length]} roughness={0.78} metalness={0.06} flatShading />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1866,18 +1998,33 @@ const SHELLS: Array<[number, number, number]> = [
 ];
 
 function ShellClusters() {
+  const SHELL_COLORS = ["#e6d3b8", "#d8c5aa", "#f0e0c8", "#c8b898"];
   return (
     <group>
-      {SHELLS.map(([x, z, scale], i) => (
-        <mesh
-          key={i}
-          position={[x, sandHeightAt(x, z) + scale * 0.25, z]}
-          rotation={[0, i * 0.7, 0]}
-        >
-          <sphereGeometry args={[scale, 6, 6]} />
-          <meshStandardMaterial color="#e6d3b8" roughness={0.7} metalness={0.05} />
-        </mesh>
-      ))}
+      {SHELLS.map(([x, z, scale], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase, z]} rotation={[0, i * 0.7, 0]}>
+            <mesh position={[0, scale * 0.15, 0]} scale={[1, 0.5, 1]}>
+              <sphereGeometry args={[scale, 8, 6]} />
+              <meshStandardMaterial color={SHELL_COLORS[i % SHELL_COLORS.length]} roughness={0.6} metalness={0.08} />
+            </mesh>
+            {Array.from({ length: 8 }).map((_, ri) => {
+              const angle = (ri / 8) * Math.PI;
+              return (
+                <mesh key={`r-${ri}`} position={[0, scale * 0.15, 0]} rotation={[0, 0, angle]}>
+                  <boxGeometry args={[scale * 2, 0.01, 0.02]} />
+                  <meshStandardMaterial color="#d0b898" roughness={0.7} metalness={0.05} />
+                </mesh>
+              );
+            })}
+            <mesh position={[0, scale * 0.25, 0]}>
+              <sphereGeometry args={[scale * 0.3, 6, 5]} />
+              <meshStandardMaterial color="#f8e8d0" roughness={0.5} metalness={0.1} />
+            </mesh>
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1886,23 +2033,49 @@ const CORAL_MOUNDS: Array<[number, number, number]> = [
   [-6, -2, 0.6],
   [12, 2, 0.5],
   [4, 8, 0.55],
+  [-14, -10, 0.5],
+  [20, 14, 0.45],
+  [0, -16, 0.55],
+  [-20, 8, 0.5],
 ];
 
 function CoralMounds() {
+  const CORAL_COLORS = ["#d97c6b", "#e08a76", "#c96858", "#e8a090", "#d45a4a", "#cc7766"];
   return (
     <group>
-      {CORAL_MOUNDS.map(([x, z, scale], i) => (
-        <group key={i} position={[x, sandHeightAt(x, z) + scale * 0.4, z]}>
-          <mesh rotation={[0, i * 0.5, 0]}>
-            <coneGeometry args={[scale * 0.6, scale * 1.4, 6]} />
-            <meshStandardMaterial color="#d97c6b" roughness={0.85} metalness={0} />
-          </mesh>
-          <mesh position={[scale * 0.4, scale * 0.2, 0]}>
-            <coneGeometry args={[scale * 0.4, scale * 1.1, 6]} />
-            <meshStandardMaterial color="#e08a76" roughness={0.85} metalness={0} />
-          </mesh>
-        </group>
-      ))}
+      {CORAL_MOUNDS.map(([x, z, scale], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase, z]}>
+            {Array.from({ length: 5 + (i % 3) }).map((_, bi) => {
+              const angle = (bi / (5 + (i % 3))) * Math.PI * 2 + i * 0.8;
+              const r = scale * (0.2 + (bi % 3) * 0.15);
+              const h = scale * (0.8 + (bi % 4) * 0.3);
+              const w = scale * (0.25 + (bi % 2) * 0.12);
+              return (
+                <mesh key={`br-${bi}`} position={[Math.cos(angle) * r, h * 0.5, Math.sin(angle) * r]} rotation={[Math.sin(bi + i) * 0.2, angle, Math.cos(bi) * 0.15]}>
+                  <coneGeometry args={[w, h, 6]} />
+                  <meshStandardMaterial color={CORAL_COLORS[(bi + i) % CORAL_COLORS.length]} roughness={0.82} metalness={0} />
+                </mesh>
+              );
+            })}
+            <mesh position={[0, scale * 0.2, 0]}>
+              <sphereGeometry args={[scale * 0.5, 8, 6]} />
+              <meshStandardMaterial color="#c06050" roughness={0.9} metalness={0} />
+            </mesh>
+            {Array.from({ length: 8 }).map((_, ti) => {
+              const angle = (ti / 8) * Math.PI * 2 + i * 1.3;
+              const r = scale * 0.3;
+              return (
+                <mesh key={`tip-${ti}`} position={[Math.cos(angle) * r, scale * 0.9 + (ti % 3) * 0.15, Math.sin(angle) * r]}>
+                  <sphereGeometry args={[0.08 + (ti % 3) * 0.03, 5, 4]} />
+                  <meshStandardMaterial color="#f0a0a0" roughness={0.6} metalness={0} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1913,18 +2086,41 @@ const SPONGES: Array<[number, number, number]> = [
 ];
 
 function SpongePillars() {
+  const SPONGE_COLORS = ["#e5b84f", "#d4a83e", "#c89830", "#edc55a"];
   return (
     <group>
-      {SPONGES.map(([x, z, scale], i) => (
-        <mesh
-          key={i}
-          position={[x, sandHeightAt(x, z) + scale * 0.6, z]}
-          rotation={[0, i * 0.4, 0]}
-        >
-          <boxGeometry args={[scale * 0.9, scale * 1.4, scale * 0.9]} />
-          <meshStandardMaterial color="#e5b84f" roughness={0.8} metalness={0.05} />
-        </mesh>
-      ))}
+      {SPONGES.map(([x, z, scale], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase, z]}>
+            <mesh position={[0, scale * 0.6, 0]} rotation={[0, i * 0.4, 0]}>
+              <cylinderGeometry args={[scale * 0.4, scale * 0.55, scale * 1.4, 8]} />
+              <meshStandardMaterial color={SPONGE_COLORS[i % SPONGE_COLORS.length]} roughness={0.85} metalness={0.03} />
+            </mesh>
+            {Array.from({ length: 10 }).map((_, pi) => {
+              const angle = (pi / 10) * Math.PI * 2;
+              const r = scale * 0.42;
+              const h = scale * (0.3 + (pi % 4) * 0.25);
+              return (
+                <mesh key={`p-${pi}`} position={[Math.cos(angle) * r, h, Math.sin(angle) * r]}>
+                  <sphereGeometry args={[0.06 + (pi % 3) * 0.02, 5, 4]} />
+                  <meshStandardMaterial color="#c89830" roughness={0.9} metalness={0} />
+                </mesh>
+              );
+            })}
+            <mesh position={[0, scale * 1.25, 0]}>
+              <torusGeometry args={[scale * 0.35, scale * 0.1, 6, 12]} />
+              <meshStandardMaterial color={SPONGE_COLORS[(i + 1) % SPONGE_COLORS.length]} roughness={0.8} metalness={0.03} />
+            </mesh>
+            {i % 2 === 0 && (
+              <mesh position={[scale * 0.4, scale * 0.3, 0]} rotation={[0, i * 1.2, 0.3]}>
+                <cylinderGeometry args={[scale * 0.2, scale * 0.3, scale * 0.7, 7]} />
+                <meshStandardMaterial color="#d4a83e" roughness={0.88} metalness={0.02} />
+              </mesh>
+            )}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1932,21 +2128,55 @@ function SpongePillars() {
 const ANEMONES: Array<[number, number]> = [
   [2, 12],
   [-4, 10],
+  [14, -8],
+  [-16, 6],
+  [8, 16],
+  [-10, -14],
 ];
 
 function AnemoneTufts() {
+  const TENTACLE_COLORS = ["#f08fa4", "#e87898", "#d4688a", "#f5a0b8", "#e06080"];
   return (
     <group>
-      {ANEMONES.map(([x, z], i) => (
-        <group key={i} position={[x, sandHeightAt(x, z) + 0.3, z]}>
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <mesh key={idx} rotation={[0, (idx / 6) * Math.PI * 2, 0]}>
-              <cylinderGeometry args={[0.04, 0.08, 0.8, 5]} />
-              <meshStandardMaterial color="#f08fa4" roughness={0.9} metalness={0} />
+      {ANEMONES.map(([x, z], i) => {
+        const yBase = sandHeightAt(x, z);
+        const tentacleCount = 14 + (i % 4) * 2;
+        return (
+          <group key={i} position={[x, yBase, z]}>
+            <mesh position={[0, 0.15, 0]}>
+              <cylinderGeometry args={[0.4, 0.5, 0.3, 8]} />
+              <meshStandardMaterial color="#a0506e" roughness={0.9} metalness={0} />
             </mesh>
-          ))}
-        </group>
-      ))}
+            <mesh position={[0, 0.32, 0]}>
+              <cylinderGeometry args={[0.45, 0.38, 0.15, 8]} />
+              <meshStandardMaterial color="#b06070" roughness={0.85} metalness={0} />
+            </mesh>
+            {Array.from({ length: tentacleCount }).map((_, ti) => {
+              const angle = (ti / tentacleCount) * Math.PI * 2;
+              const ring = ti < tentacleCount / 2 ? 0.25 : 0.15;
+              const h = 0.6 + (ti % 4) * 0.15;
+              const tilt = 0.3 + (ti % 3) * 0.1;
+              return (
+                <mesh key={`t-${ti}`} position={[Math.cos(angle) * ring, 0.4 + h * 0.5, Math.sin(angle) * ring]} rotation={[Math.cos(angle) * tilt, 0, Math.sin(angle) * tilt]}>
+                  <cylinderGeometry args={[0.025, 0.045, h, 4]} />
+                  <meshStandardMaterial color={TENTACLE_COLORS[ti % TENTACLE_COLORS.length]} roughness={0.75} metalness={0} />
+                </mesh>
+              );
+            })}
+            {Array.from({ length: tentacleCount }).map((_, ti) => {
+              const angle = (ti / tentacleCount) * Math.PI * 2;
+              const ring = ti < tentacleCount / 2 ? 0.25 : 0.15;
+              const h = 0.6 + (ti % 4) * 0.15;
+              return (
+                <mesh key={`tip-${ti}`} position={[Math.cos(angle) * ring, 0.4 + h, Math.sin(angle) * ring]}>
+                  <sphereGeometry args={[0.04, 5, 4]} />
+                  <meshStandardMaterial color="#f8c0d0" roughness={0.6} metalness={0.05} emissive="#f8c0d0" emissiveIntensity={0.15} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1954,25 +2184,66 @@ function AnemoneTufts() {
 const KELP_CLUSTERS: Array<[number, number]> = [
   [18, 6],
   [-18, -2],
+  [22, -10],
+  [-22, 12],
+  [6, -18],
+  [-8, 18],
 ];
 
 function KelpClusters() {
+  const KELP_COLORS = ["#2f7a55", "#2d6a4f", "#347f59", "#287045", "#3c8f66"];
   return (
     <group>
-      {KELP_CLUSTERS.map(([x, z], i) => (
-        <group
-          key={i}
-          position={[x, sandHeightAt(x, z), z]}
-          rotation={[0, i * 0.4, 0]}
-        >
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <mesh key={idx} position={[idx * 0.2 - 0.2, 1.5, 0]} rotation={[0, 0, 0.2]}>
-              <cylinderGeometry args={[0.08, 0.14, 3.2, 6]} />
-              <meshStandardMaterial color="#2f7a55" roughness={0.9} metalness={0} />
+      {KELP_CLUSTERS.map(([x, z], i) => {
+        const yBase = sandHeightAt(x, z);
+        const bladeCount = 5 + (i % 3) * 2;
+        return (
+          <group key={i} position={[x, yBase, z]} rotation={[0, i * 0.4, 0]}>
+            <mesh position={[0, 0.1, 0]}>
+              <sphereGeometry args={[0.4, 6, 5]} />
+              <meshStandardMaterial color="#2a5a42" roughness={0.95} metalness={0} />
             </mesh>
-          ))}
-        </group>
-      ))}
+            {Array.from({ length: bladeCount }).map((_, bi) => {
+              const angle = (bi / bladeCount) * Math.PI * 2;
+              const offsetX = Math.cos(angle) * 0.3;
+              const offsetZ = Math.sin(angle) * 0.3;
+              const h = 3.0 + (bi % 4) * 0.8;
+              const curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(offsetX, 0, offsetZ),
+                new THREE.Vector3(offsetX + Math.sin(bi + i) * 0.6, h * 0.3, offsetZ + Math.cos(bi) * 0.4),
+                new THREE.Vector3(offsetX + Math.sin(bi * 0.7 + i) * 1.0, h * 0.6, offsetZ + Math.cos(bi * 1.2) * 0.6),
+                new THREE.Vector3(offsetX + Math.sin(bi * 1.3 + i * 0.5) * 1.2, h * 0.85, offsetZ + Math.cos(bi * 0.8 + i) * 0.7),
+                new THREE.Vector3(offsetX + Math.sin(bi * 0.9 + i * 1.1) * 0.8, h, offsetZ + Math.cos(bi * 1.5) * 0.5),
+              ]);
+              return (
+                <group key={`blade-${bi}`}>
+                  <mesh>
+                    <tubeGeometry args={[curve, 18, 0.08 + (bi % 3) * 0.02, 5, false]} />
+                    <meshStandardMaterial color={KELP_COLORS[bi % KELP_COLORS.length]} roughness={0.85} metalness={0} />
+                  </mesh>
+                  {Array.from({ length: 4 }).map((_, li) => {
+                    const t = 0.2 + (li / 4) * 0.6;
+                    const pt = curve.getPointAt(t);
+                    const side = li % 2 === 0 ? 1 : -1;
+                    return (
+                      <mesh key={`kl-${li}`} position={[pt.x + side * 0.15, pt.y, pt.z]} rotation={[0.2 * side, bi + li * 0.5, 0.4 * side]}>
+                        <planeGeometry args={[0.5 + (li % 3) * 0.15, 0.25]} />
+                        <meshStandardMaterial color={KELP_COLORS[(bi + li) % KELP_COLORS.length]} roughness={0.8} metalness={0} side={THREE.DoubleSide} />
+                      </mesh>
+                    );
+                  })}
+                  {bi % 2 === 0 && (
+                    <mesh position={[curve.getPointAt(0.95).x, curve.getPointAt(0.95).y, curve.getPointAt(0.95).z]}>
+                      <sphereGeometry args={[0.12, 6, 5]} />
+                      <meshStandardMaterial color="#4a9a6a" roughness={0.7} metalness={0} />
+                    </mesh>
+                  )}
+                </group>
+              );
+            })}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1983,16 +2254,22 @@ const PEBBLE_PILES: Array<[number, number]> = [
 ];
 
 function PebblePiles() {
+  const PEBBLE_COLORS = ["#a08e75", "#8e7c65", "#b09e85", "#968470", "#a89878"];
   return (
     <group>
       {PEBBLE_PILES.map(([x, z], i) => (
-        <group key={i} position={[x, sandHeightAt(x, z) + 0.2, z]}>
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <mesh key={idx} position={[Math.sin(idx) * 0.4, 0, Math.cos(idx) * 0.4]}>
-              <icosahedronGeometry args={[0.16, 0]} />
-              <meshStandardMaterial color="#a08e75" roughness={0.98} metalness={0} flatShading />
-            </mesh>
-          ))}
+        <group key={i} position={[x, sandHeightAt(x, z) + 0.1, z]}>
+          {Array.from({ length: 12 }).map((_, idx) => {
+            const angle = (idx / 12) * Math.PI * 2 + i;
+            const dist = 0.2 + (idx % 3) * 0.15;
+            const sz = 0.1 + (idx % 4) * 0.05;
+            return (
+              <mesh key={idx} position={[Math.cos(angle) * dist, sz * 0.3 + (idx % 2) * 0.05, Math.sin(angle) * dist]} rotation={[idx * 0.3, idx * 0.5, idx * 0.2]}>
+                <dodecahedronGeometry args={[sz, 1]} />
+                <meshStandardMaterial color={PEBBLE_COLORS[idx % PEBBLE_COLORS.length]} roughness={0.98} metalness={0} flatShading />
+              </mesh>
+            );
+          })}
         </group>
       ))}
     </group>
@@ -2007,38 +2284,150 @@ const REEF_ARCHES: Array<[number, number]> = [
 function ReefArches() {
   return (
     <group>
-      {REEF_ARCHES.map(([x, z], i) => (
-        <group key={i} position={[x, sandHeightAt(x, z) + 0.6, z]}>
-          <mesh position={[-0.5, 0, 0]}>
-            <boxGeometry args={[0.5, 1.2, 0.5]} />
-            <meshStandardMaterial color="#7a6a55" roughness={0.9} metalness={0.05} />
-          </mesh>
-          <mesh position={[0.5, 0, 0]}>
-            <boxGeometry args={[0.5, 1.2, 0.5]} />
-            <meshStandardMaterial color="#7a6a55" roughness={0.9} metalness={0.05} />
-          </mesh>
-          <mesh position={[0, 0.6, 0]}>
-            <boxGeometry args={[1.4, 0.4, 0.6]} />
-            <meshStandardMaterial color="#7a6a55" roughness={0.9} metalness={0.05} />
-          </mesh>
-        </group>
-      ))}
+      {REEF_ARCHES.map(([x, z], i) => {
+        const yBase = sandHeightAt(x, z);
+        const pillarStones = 6;
+        return (
+          <group key={i} position={[x, yBase, z]} rotation={[0, i * 0.8, 0]}>
+            {Array.from({ length: pillarStones }).map((_, pi) => (
+              <mesh key={`l-${pi}`} position={[-0.5 + Math.sin(pi + i) * 0.08, pi * 0.22 + 0.12, Math.cos(pi * 0.7) * 0.06]} rotation={[pi * 0.1, pi * 0.3, 0]}>
+                <dodecahedronGeometry args={[0.28 + (pi % 2) * 0.05, 1]} />
+                <meshStandardMaterial color={pi % 2 === 0 ? "#6a5a45" : "#7a6b58"} roughness={0.92} metalness={0.02} flatShading />
+              </mesh>
+            ))}
+            {Array.from({ length: pillarStones }).map((_, pi) => (
+              <mesh key={`r-${pi}`} position={[0.5 + Math.sin(pi + i * 2) * 0.08, pi * 0.22 + 0.12, Math.cos(pi * 0.9) * 0.06]} rotation={[pi * 0.15, pi * 0.2, 0]}>
+                <dodecahedronGeometry args={[0.28 + (pi % 3) * 0.04, 1]} />
+                <meshStandardMaterial color={pi % 2 === 0 ? "#7a6b58" : "#6a5a45"} roughness={0.92} metalness={0.02} flatShading />
+              </mesh>
+            ))}
+            {Array.from({ length: 5 }).map((_, ai) => {
+              const t = ai / 4;
+              const angle = Math.PI * t;
+              return (
+                <mesh key={`a-${ai}`} position={[Math.cos(angle) * 0.5, pillarStones * 0.22 + Math.sin(angle) * 0.3, 0]} rotation={[0, 0, angle - Math.PI / 2]}>
+                  <dodecahedronGeometry args={[0.25 + (ai % 2) * 0.05, 1]} />
+                  <meshStandardMaterial color="#7a6a55" roughness={0.9} metalness={0.03} flatShading />
+                </mesh>
+              );
+            })}
+            <mesh position={[-0.6, 0.05, 0]}>
+              <sphereGeometry args={[0.15, 5, 4]} />
+              <meshStandardMaterial color="#3d5c3d" roughness={0.95} metalness={0} />
+            </mesh>
+            <mesh position={[0.55, 0.05, 0.1]}>
+              <sphereGeometry args={[0.12, 5, 4]} />
+              <meshStandardMaterial color="#4a6a3e" roughness={0.95} metalness={0} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+const CORAL_FAN_POSITIONS: Array<[number, number]> = [
+  [-12, 6], [10, -10], [18, 12], [-20, -8], [0, 14], [-8, -18],
+];
+
+function CoralFans() {
+  const FAN_COLORS = ["#e06858", "#d45a4a", "#c94838", "#e87868", "#b03828"];
+  return (
+    <group>
+      {CORAL_FAN_POSITIONS.map(([x, z], i) => {
+        const yBase = sandHeightAt(x, z);
+        const fanHeight = 1.8 + (i % 3) * 0.4;
+        const ribCount = 7 + (i % 4);
+        return (
+          <group key={i} position={[x, yBase, z]} rotation={[0, i * 1.2, 0]}>
+            <mesh position={[0, 0.2, 0]}>
+              <cylinderGeometry args={[0.12, 0.2, 0.4, 6]} />
+              <meshStandardMaterial color="#8a6050" roughness={0.9} metalness={0} />
+            </mesh>
+            {Array.from({ length: ribCount }).map((_, ri) => {
+              const angle = -0.6 + (ri / (ribCount - 1)) * 1.2;
+              const h = fanHeight * (0.7 + (ri % 3) * 0.15);
+              const curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, 0.35, 0),
+                new THREE.Vector3(Math.sin(angle) * h * 0.3, 0.35 + h * 0.4, 0.1),
+                new THREE.Vector3(Math.sin(angle) * h * 0.5, 0.35 + h * 0.75, 0.15),
+                new THREE.Vector3(Math.sin(angle) * h * 0.55, 0.35 + h, 0.08),
+              ]);
+              return (
+                <mesh key={`rib-${ri}`}>
+                  <tubeGeometry args={[curve, 12, 0.03 + (ri % 2) * 0.01, 4, false]} />
+                  <meshStandardMaterial color={FAN_COLORS[ri % FAN_COLORS.length]} roughness={0.75} metalness={0} />
+                </mesh>
+              );
+            })}
+            {Array.from({ length: ribCount - 1 }).map((_, mi) => {
+              const a1 = -0.6 + (mi / (ribCount - 1)) * 1.2;
+              const a2 = -0.6 + ((mi + 1) / (ribCount - 1)) * 1.2;
+              const h = fanHeight * 0.6;
+              const cx = (Math.sin(a1) + Math.sin(a2)) * h * 0.25;
+              const cy = 0.35 + h * 0.5;
+              return (
+                <mesh key={`mem-${mi}`} position={[cx, cy, 0.1]} rotation={[0, 0, (a1 + a2) / 2]}>
+                  <planeGeometry args={[0.25, h * 0.6]} />
+                  <meshStandardMaterial color={FAN_COLORS[(mi + i) % FAN_COLORS.length]} roughness={0.8} metalness={0} side={THREE.DoubleSide} transparent opacity={0.85} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+const SEA_GRASS_POSITIONS: Array<[number, number]> = [
+  [-16, -14], [14, 16], [-22, 0], [20, -6], [0, -20], [-4, 20], [10, 10], [-12, -6],
+];
+
+function SeaGrassBeds() {
+  const GRASS_COLORS = ["#3a7a4a", "#2d6a3f", "#4a8a5a", "#358a48", "#2a6035"];
+  return (
+    <group>
+      {SEA_GRASS_POSITIONS.map(([x, z], i) => {
+        const yBase = sandHeightAt(x, z);
+        const bladeCount = 10 + (i % 5) * 3;
+        return (
+          <group key={i} position={[x, yBase, z]}>
+            {Array.from({ length: bladeCount }).map((_, bi) => {
+              const angle = (bi / bladeCount) * Math.PI * 2 + i;
+              const dist = 0.3 + (bi % 4) * 0.15;
+              const bx = Math.cos(angle) * dist;
+              const bz = Math.sin(angle) * dist;
+              const h = 0.8 + (bi % 5) * 0.25;
+              const lean = 0.15 + (bi % 3) * 0.08;
+              return (
+                <mesh key={`gb-${bi}`} position={[bx, h * 0.5, bz]} rotation={[Math.cos(angle) * lean, 0, Math.sin(angle) * lean]}>
+                  <planeGeometry args={[0.08, h]} />
+                  <meshStandardMaterial color={GRASS_COLORS[bi % GRASS_COLORS.length]} roughness={0.85} metalness={0} side={THREE.DoubleSide} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
     </group>
   );
 }
 
 function IrregularRockCluster({ seed, scale }: { seed: number; scale: number }) {
+  const CLUSTER_COLORS = ["#5a4a35", "#6a5a45", "#7a6b58", "#8a7b68", "#5e5040"];
   const rocks = useMemo(() => {
-    const result: Array<{ pos: [number, number, number]; size: number; rot: [number, number, number] }> = [];
-    const count = 5 + Math.floor(seed * 3) % 4;
+    const result: Array<{ pos: [number, number, number]; size: number; rot: [number, number, number]; sub: number }> = [];
+    const count = 7 + Math.floor(seed * 3) % 5;
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2 + seed * 0.5;
-      const dist = scale * 0.3 + (Math.sin(seed * 10 + i * 2.3) * 0.5 + 0.5) * scale * 0.4;
-      const height = scale * 0.3 + (Math.cos(seed * 7 + i * 1.7) * 0.5 + 0.5) * scale * 0.6;
+      const dist = scale * 0.25 + (Math.sin(seed * 10 + i * 2.3) * 0.5 + 0.5) * scale * 0.45;
+      const height = scale * 0.25 + (Math.cos(seed * 7 + i * 1.7) * 0.5 + 0.5) * scale * 0.55;
       result.push({
         pos: [Math.cos(angle) * dist, height, Math.sin(angle) * dist],
-        size: scale * 0.25 + (Math.sin(seed * 5 + i) * 0.5 + 0.5) * scale * 0.35,
+        size: scale * 0.2 + (Math.sin(seed * 5 + i) * 0.5 + 0.5) * scale * 0.3,
         rot: [seed + i * 0.3, i * 0.7, seed * 0.5 + i * 0.2],
+        sub: i % 3 === 0 ? 2 : 1,
       });
     }
     return result;
@@ -2047,73 +2436,105 @@ function IrregularRockCluster({ seed, scale }: { seed: number; scale: number }) 
   return (
     <group>
       {rocks.map((rock, i) => (
-        <mesh key={i} position={rock.pos} rotation={rock.rot}>
-          <dodecahedronGeometry args={[rock.size, 0]} />
-          <meshStandardMaterial 
-            color={i % 2 === 0 ? "#6a5a45" : "#7a6b58"} 
-            roughness={0.95} 
-            flatShading 
-          />
-        </mesh>
+        <group key={i}>
+          <mesh position={rock.pos} rotation={rock.rot}>
+            <dodecahedronGeometry args={[rock.size, rock.sub]} />
+            <meshStandardMaterial color={CLUSTER_COLORS[i % CLUSTER_COLORS.length]} roughness={0.95} flatShading />
+          </mesh>
+          {i % 3 === 0 && (
+            <mesh position={[rock.pos[0], rock.pos[1] + rock.size * 0.7, rock.pos[2]]}>
+              <sphereGeometry args={[0.12, 5, 4]} />
+              <meshStandardMaterial color="#3d5c3d" roughness={0.95} metalness={0} />
+            </mesh>
+          )}
+        </group>
       ))}
     </group>
   );
 }
 
 function CaveArch({ scale, seed }: { scale: number; seed: number }) {
+  const ARCH_COLORS = ["#5a4a35", "#6a5a45", "#7a6b58", "#4e4030", "#685848"];
   const rocks = useMemo(() => {
-    const result: Array<{ pos: [number, number, number]; size: number; rot: number }> = [];
-    const leftPillar = 8 + Math.floor(seed * 2) % 3;
+    const result: Array<{ pos: [number, number, number]; size: number; rot: number; sub: number }> = [];
+    const leftPillar = 10 + Math.floor(seed * 2) % 4;
     for (let i = 0; i < leftPillar; i++) {
       const t = i / leftPillar;
-      const x = -scale * 0.5 + Math.sin(seed * 3 + i) * scale * 0.15;
-      const y = t * scale * 1.2;
-      const z = Math.cos(seed * 5 + i * 0.8) * scale * 0.1;
+      const x = -scale * 0.5 + Math.sin(seed * 3 + i) * scale * 0.12;
+      const y = t * scale * 1.3;
+      const z = Math.cos(seed * 5 + i * 0.8) * scale * 0.08;
       result.push({
         pos: [x, y, z],
-        size: scale * 0.25 + Math.sin(seed + i) * scale * 0.1,
+        size: scale * 0.22 + Math.sin(seed + i) * scale * 0.08,
         rot: seed + i * 0.4,
+        sub: i % 4 === 0 ? 2 : 1,
       });
     }
-    const rightPillar = 8 + Math.floor(seed * 3) % 3;
+    const rightPillar = 10 + Math.floor(seed * 3) % 4;
     for (let i = 0; i < rightPillar; i++) {
       const t = i / rightPillar;
-      const x = scale * 0.5 + Math.sin(seed * 4 + i) * scale * 0.15;
-      const y = t * scale * 1.2;
-      const z = Math.cos(seed * 6 + i * 0.9) * scale * 0.1;
+      const x = scale * 0.5 + Math.sin(seed * 4 + i) * scale * 0.12;
+      const y = t * scale * 1.3;
+      const z = Math.cos(seed * 6 + i * 0.9) * scale * 0.08;
       result.push({
         pos: [x, y, z],
-        size: scale * 0.25 + Math.cos(seed + i) * scale * 0.1,
+        size: scale * 0.22 + Math.cos(seed + i) * scale * 0.08,
         rot: seed * 2 + i * 0.3,
+        sub: i % 3 === 0 ? 2 : 1,
       });
     }
-    const archTop = 6 + Math.floor(seed * 2) % 3;
+    const archTop = 8 + Math.floor(seed * 2) % 3;
     for (let i = 0; i < archTop; i++) {
       const t = i / (archTop - 1);
       const angle = Math.PI * t;
       const x = Math.cos(angle) * scale * 0.5;
-      const y = scale * 1.1 + Math.sin(angle) * scale * 0.3;
+      const y = scale * 1.2 + Math.sin(angle) * scale * 0.35;
       result.push({
-        pos: [x, y, Math.sin(seed * 2 + i) * scale * 0.1],
-        size: scale * 0.3 + Math.sin(seed * 3 + i) * scale * 0.1,
+        pos: [x, y, Math.sin(seed * 2 + i) * scale * 0.08],
+        size: scale * 0.28 + Math.sin(seed * 3 + i) * scale * 0.08,
         rot: seed + i,
+        sub: 1,
       });
     }
     return result;
   }, [scale, seed]);
 
+  const stalactites = useMemo(() => {
+    const out: Array<{ pos: [number, number, number]; h: number }> = [];
+    const count = 4 + Math.floor(seed * 2) % 3;
+    for (let i = 0; i < count; i++) {
+      const t = 0.2 + (i / count) * 0.6;
+      const angle = Math.PI * t;
+      out.push({
+        pos: [Math.cos(angle) * scale * 0.4, scale * 1.15 + Math.sin(angle) * scale * 0.25, Math.sin(seed + i) * scale * 0.05],
+        h: 0.3 + (i % 3) * 0.15,
+      });
+    }
+    return out;
+  }, [scale, seed]);
+
   return (
     <group>
       {rocks.map((rock, i) => (
-        <mesh key={i} position={rock.pos} rotation={[rock.rot * 0.3, rock.rot, rock.rot * 0.2]}>
-          <dodecahedronGeometry args={[rock.size, 0]} />
-          <meshStandardMaterial 
-            color={i % 3 === 0 ? "#5a4a35" : i % 3 === 1 ? "#6a5a45" : "#7a6b58"} 
-            roughness={0.95} 
-            flatShading 
-          />
+        <mesh key={`r-${i}`} position={rock.pos} rotation={[rock.rot * 0.3, rock.rot, rock.rot * 0.2]}>
+          <dodecahedronGeometry args={[rock.size, rock.sub]} />
+          <meshStandardMaterial color={ARCH_COLORS[i % ARCH_COLORS.length]} roughness={0.95} flatShading />
         </mesh>
       ))}
+      {stalactites.map((st, si) => (
+        <mesh key={`st-${si}`} position={st.pos} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.1, st.h, 5]} />
+          <meshStandardMaterial color="#8a7b6a" roughness={0.9} metalness={0.02} />
+        </mesh>
+      ))}
+      <mesh position={[-scale * 0.5, scale * 0.1, 0]}>
+        <sphereGeometry args={[scale * 0.12, 5, 4]} />
+        <meshStandardMaterial color="#3d5c3d" roughness={0.95} metalness={0} />
+      </mesh>
+      <mesh position={[scale * 0.5, scale * 0.08, 0]}>
+        <sphereGeometry args={[scale * 0.1, 5, 4]} />
+        <meshStandardMaterial color="#4a6a3e" roughness={0.95} metalness={0} />
+      </mesh>
     </group>
   );
 }
@@ -2158,28 +2579,52 @@ const CAVE_DOMES: Array<[number, number, number]> = [
 function CaveDomes() {
   return (
     <group>
-      {CAVE_DOMES.map(([x, z, radius], i) => (
-        <group key={i} position={[x, sandHeightAt(x, z) + radius * 0.35, z]}>
-          <mesh rotation={[0, i * 0.4, 0]}>
-            <icosahedronGeometry args={[radius, 1]} />
-            <meshStandardMaterial color="#7a6b5a" roughness={0.9} metalness={0.05} />
-          </mesh>
-          {Array.from({ length: 8 }).map((_, idx) => (
-            <mesh
-              key={idx}
-              position={[
-                Math.cos(idx * 0.8 + i) * radius * 0.9,
-                (idx % 3) * 0.4,
-                Math.sin(idx * 0.8 + i) * radius * 0.9,
-              ]}
-              rotation={[0, idx * 0.6, 0]}
-            >
-              <dodecahedronGeometry args={[0.7 + (idx % 3) * 0.15, 0]} />
-              <meshStandardMaterial color="#8f7b66" roughness={0.9} metalness={0.05} />
+      {CAVE_DOMES.map(([x, z, radius], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase, z]}>
+            <mesh position={[0, radius * 0.35, 0]} rotation={[0, i * 0.4, 0]}>
+              <icosahedronGeometry args={[radius, 2]} />
+              <meshStandardMaterial color="#6a5b4a" roughness={0.92} metalness={0.03} flatShading />
             </mesh>
-          ))}
-        </group>
-      ))}
+            <mesh position={[0, radius * 0.6, 0]} rotation={[0, i * 0.7, 0]} scale={[1.1, 0.5, 1.1]}>
+              <icosahedronGeometry args={[radius * 0.85, 1]} />
+              <meshStandardMaterial color="#5a4d3e" roughness={0.95} metalness={0} flatShading transparent opacity={0.9} />
+            </mesh>
+            {Array.from({ length: 5 }).map((_, si) => {
+              const angle = (si / 5) * Math.PI * 2 + i * 0.5;
+              const stalH = 0.8 + (si % 3) * 0.4;
+              return (
+                <mesh key={`stal-${si}`} position={[Math.cos(angle) * radius * 0.5, radius * 0.55 + stalH * 0.3, Math.sin(angle) * radius * 0.5]} rotation={[0.1 * Math.sin(si), 0, 0.1 * Math.cos(si)]}>
+                  <coneGeometry args={[0.15 + (si % 2) * 0.08, stalH, 5]} />
+                  <meshStandardMaterial color="#8a7b6a" roughness={0.9} metalness={0.02} />
+                </mesh>
+              );
+            })}
+            {Array.from({ length: 12 }).map((_, idx) => {
+              const angle = idx * 0.52 + i;
+              const dist = radius * (0.75 + (idx % 3) * 0.12);
+              const boulderScale = 0.5 + (idx % 4) * 0.2;
+              return (
+                <mesh key={`rub-${idx}`} position={[Math.cos(angle) * dist, boulderScale * 0.25, Math.sin(angle) * dist]} rotation={[idx * 0.3, idx * 0.5, idx * 0.2]}>
+                  <dodecahedronGeometry args={[boulderScale, 1]} />
+                  <meshStandardMaterial color={idx % 2 === 0 ? "#7a6b5a" : "#8f7b66"} roughness={0.93} metalness={0.02} flatShading />
+                </mesh>
+              );
+            })}
+            {Array.from({ length: 6 }).map((_, mi) => {
+              const angle = mi * 1.05 + i * 0.3;
+              const r = radius * 0.6;
+              return (
+                <mesh key={`moss-${mi}`} position={[Math.cos(angle) * r, radius * 0.5 + mi * 0.1, Math.sin(angle) * r]} rotation={[0.3 * mi, angle, 0]}>
+                  <sphereGeometry args={[0.25 + (mi % 3) * 0.1, 6, 4]} />
+                  <meshStandardMaterial color={mi % 2 === 0 ? "#3d5c3d" : "#4a6a3e"} roughness={0.95} metalness={0} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -2216,20 +2661,51 @@ const BARNACLE_ROCKS: Array<[number, number, number]> = [
 function BarnacleRocks() {
   return (
     <group>
-      {BARNACLE_ROCKS.map(([x, z, scale], i) => (
-        <group key={i} position={[x, sandHeightAt(x, z) + scale * 0.4, z]}>
-          <mesh>
-            <dodecahedronGeometry args={[scale, 0]} />
-            <meshStandardMaterial color="#7e6a56" roughness={0.95} metalness={0} flatShading />
-          </mesh>
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <mesh key={idx} position={[Math.sin(idx) * 0.4, scale * 0.2, Math.cos(idx) * 0.4]}>
-              <coneGeometry args={[0.12, 0.3, 5]} />
-              <meshStandardMaterial color="#d9c9b0" roughness={0.85} metalness={0.05} />
+      {BARNACLE_ROCKS.map(([x, z, scale], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase + scale * 0.4, z]}>
+            <mesh rotation={[0.1 * i, i * 0.7, 0]}>
+              <icosahedronGeometry args={[scale, 2]} />
+              <meshStandardMaterial color="#6e5e4a" roughness={0.95} metalness={0} flatShading />
             </mesh>
-          ))}
-        </group>
-      ))}
+            <mesh rotation={[0, i * 0.3, 0]} scale={[1, 0.6, 1]}>
+              <dodecahedronGeometry args={[scale * 1.1, 1]} />
+              <meshStandardMaterial color="#7e6a56" roughness={0.93} metalness={0.01} flatShading />
+            </mesh>
+            {Array.from({ length: 8 }).map((_, idx) => {
+              const angle = (idx / 8) * Math.PI * 2 + i;
+              const r = scale * 0.6;
+              const bSize = 0.08 + (idx % 3) * 0.04;
+              return (
+                <mesh key={`b-${idx}`} position={[Math.cos(angle) * r, scale * 0.3 + (idx % 3) * 0.08, Math.sin(angle) * r]}>
+                  <coneGeometry args={[bSize, bSize * 2.5, 5]} />
+                  <meshStandardMaterial color={idx % 2 === 0 ? "#d9c9b0" : "#c4b89a"} roughness={0.85} metalness={0.05} />
+                </mesh>
+              );
+            })}
+            {i % 2 === 0 && Array.from({ length: 6 }).map((_, ti) => {
+              const angle = (ti / 6) * Math.PI * 2 + i * 1.5;
+              const r = scale * 0.35;
+              return (
+                <mesh key={`ten-${ti}`} position={[Math.cos(angle) * r, scale * 0.5, Math.sin(angle) * r]} rotation={[Math.sin(ti) * 0.4, 0, Math.cos(ti) * 0.4]}>
+                  <cylinderGeometry args={[0.03, 0.02, 0.5 + (ti % 3) * 0.15, 4]} />
+                  <meshStandardMaterial color={ti % 2 === 0 ? "#e06050" : "#d04838"} roughness={0.7} metalness={0} />
+                </mesh>
+              );
+            })}
+            {Array.from({ length: 3 }).map((_, tw) => {
+              const angle = tw * 2.1 + i * 0.8;
+              return (
+                <mesh key={`tw-${tw}`} position={[Math.cos(angle) * scale * 0.5, scale * 0.35, Math.sin(angle) * scale * 0.5]} rotation={[0.2, angle, 0.1]}>
+                  <cylinderGeometry args={[0.04, 0.06, 0.6 + tw * 0.15, 5]} />
+                  <meshStandardMaterial color="#a08060" roughness={0.9} metalness={0.02} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -2424,88 +2900,707 @@ function EdgeFrame() {
 const VINE_COLORS = ["#2d5a45", "#326b50", "#3a7a5a", "#28503d"];
 const LEAF_COLORS = ["#3d8a5f", "#459968", "#4da872", "#55b87c"];
 
+function VineStrand({
+  index,
+  x,
+  z,
+  baseY,
+  fullHeight,
+}: {
+  index: number;
+  x: number;
+  z: number;
+  baseY: number;
+  fullHeight: number;
+}) {
+  const vineColor = VINE_COLORS[index % VINE_COLORS.length];
+  const leafColor = LEAF_COLORS[index % LEAF_COLORS.length];
+  const heightScale = 0.58 + (index % 6) * 0.06;
+  const vineHeight = fullHeight * heightScale;
+  const curveAmp = 0.8 + Math.sin(index * 1.7) * 0.5 + (index % 3) * 0.25;
+  const radiusBase = 0.28 + (index % 4) * 0.08;
+  const radiusTip = 0.12 + (index % 3) * 0.04;
+  const seed = index * 2.1 + 0.7;
+  const leafScale = 0.9 + (index % 4) * 0.2;
+
+  const curve = useMemo(() => {
+    const points: THREE.Vector3[] = [];
+    const steps = 24;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const y = t * vineHeight;
+      const phase1 = t * Math.PI * 1.2 + seed;
+      const phase2 = t * Math.PI * 2.1 + seed * 0.8;
+      const bendX = (Math.sin(phase1) * curveAmp + Math.sin(phase2) * curveAmp * 0.4) * (0.1 + t * 0.9);
+      const bendZ = (Math.cos(phase1 * 0.9 + 0.5) * curveAmp * 0.85 + Math.cos(phase2 * 0.7) * curveAmp * 0.35) * (0.1 + t * 0.9);
+      points.push(new THREE.Vector3(bendX, y, bendZ));
+    }
+    return new THREE.CatmullRomCurve3(points);
+  }, [vineHeight, curveAmp, seed]);
+
+  const tubeGeo = useMemo(() => {
+    const r0 = radiusBase * 0.95;
+    const r1 = radiusTip * 0.95;
+    return new THREE.TubeGeometry(curve, 32, (r0 + r1) / 2, 8, false);
+  }, [curve, radiusBase, radiusTip]);
+
+  const leafTs = [0.15, 0.28, 0.42, 0.55, 0.68, 0.82, 0.92];
+
+  return (
+    <group position={[x, baseY, z]}>
+      <mesh>
+        <primitive object={tubeGeo} attach="geometry" />
+        <meshStandardMaterial color={vineColor} roughness={0.85} metalness={0} />
+      </mesh>
+      {leafTs.map((t, li) => {
+        const pt = curve.getPointAt(t);
+        const side = li % 2 === 0 ? 1 : -1;
+        const lw = (1.2 + (li % 3) * 0.25) * leafScale;
+        const lh = (0.5 + (li % 2) * 0.15) * leafScale;
+        return (
+          <group key={li}>
+            <mesh position={[pt.x + side * 0.5, pt.y, pt.z]} rotation={[0.2 * side, index * 0.5 + li, 0.5 * side]}>
+              <planeGeometry args={[lw, lh]} />
+              <meshStandardMaterial color={leafColor} roughness={0.78} metalness={0} side={THREE.DoubleSide} />
+            </mesh>
+            {(li % 2 === 0 || li === 3) && (
+              <mesh position={[pt.x - side * 0.4, pt.y + 0.3, pt.z + 0.15]} rotation={[-0.2 * side, li * 0.7, -0.4 * side]}>
+                <planeGeometry args={[lw * 0.85, lh * 0.9]} />
+                <meshStandardMaterial color={LEAF_COLORS[(index + li) % LEAF_COLORS.length]} roughness={0.78} metalness={0} side={THREE.DoubleSide} />
+              </mesh>
+            )}
+          </group>
+        );
+      })}
+      <mesh position={[0, vineHeight * 0.98, 0]}>
+        <sphereGeometry args={[radiusTip * 2.5, 6, 5]} />
+        <meshStandardMaterial color="#3a5a3a" roughness={0.95} metalness={0} />
+      </mesh>
+    </group>
+  );
+}
+
 function WallVines() {
   const hw = TANK_BOX[0] / 2 - 0.5;
   const hh = TANK_BOX[1] / 2;
   const hd = TANK_BOX[2] / 2 - 0.5;
   const floorY = -hh;
+  const fullHeight = (hh * 2 - 2) * 0.88;
 
   const vines = [
-    { x: -hw, z: -12, segments: 6, baseY: floorY + 1 },
-    { x: -hw, z: 8, segments: 7, baseY: floorY + 0.5 },
-    { x: -hw, z: 18, segments: 5, baseY: floorY + 1.5 },
-    { x: hw, z: -8, segments: 6, baseY: floorY + 1 },
-    { x: hw, z: 14, segments: 7, baseY: floorY + 0.8 },
-    { x: 8, z: -hd, segments: 5, baseY: floorY + 1.2 },
-    { x: -10, z: -hd, segments: 6, baseY: floorY + 0.6 },
-    { x: -18, z: -hd, segments: 4, baseY: floorY + 1 },
-    { x: 0, z: hd, segments: 5, baseY: floorY + 1.4 },
-    { x: 16, z: hd, segments: 6, baseY: floorY + 0.9 },
-    { x: -hw, z: -20, segments: 7, baseY: floorY + 0.7 },
-    { x: -hw, z: 0, segments: 6, baseY: floorY + 1.1 },
-    { x: hw, z: -18, segments: 7, baseY: floorY + 0.6 },
-    { x: hw, z: 2, segments: 6, baseY: floorY + 1.3 },
-    { x: -6, z: hd, segments: 6, baseY: floorY + 1.2 },
-    { x: 22, z: hd, segments: 5, baseY: floorY + 0.7 },
-    { x: 12, z: -hd, segments: 6, baseY: floorY + 1.0 },
-    { x: -22, z: -hd, segments: 6, baseY: floorY + 0.8 },
+    { x: -hw, z: -20 }, { x: -hw, z: -12 }, { x: -hw, z: -4 }, { x: -hw, z: 4 }, { x: -hw, z: 12 }, { x: -hw, z: 20 },
+    { x: hw, z: -18 }, { x: hw, z: -8 }, { x: hw, z: 2 }, { x: hw, z: 10 }, { x: hw, z: 18 },
+    { x: -22, z: -hd }, { x: -14, z: -hd }, { x: -6, z: -hd }, { x: 2, z: -hd }, { x: 10, z: -hd }, { x: 18, z: -hd },
+    { x: -18, z: hd }, { x: -8, z: hd }, { x: 0, z: hd }, { x: 10, z: hd }, { x: 20, z: hd },
+    { x: -hw, z: -16 }, { x: -hw, z: 8 }, { x: hw, z: -14 }, { x: hw, z: 6 },
   ];
 
   return (
     <group>
-      {vines.map((vine, i) => {
-        const segmentHeight = 4.5;
-        const vineColor = VINE_COLORS[i % VINE_COLORS.length];
-        const leafColor = LEAF_COLORS[i % LEAF_COLORS.length];
-        
+      {vines.map((vine, i) => (
+        <VineStrand
+          key={i}
+          index={i}
+          x={vine.x}
+          z={vine.z}
+          baseY={floorY + 0.5 + (i % 4) * 0.25}
+          fullHeight={fullHeight}
+        />
+      ))}
+    </group>
+  );
+}
+
+/* ── Treasure Chest ── */
+const TREASURE_POSITIONS: Array<[number, number, number]> = [
+  [-16, 12, 0.4],
+  [18, -14, -0.3],
+];
+
+function TreasureChests() {
+  return (
+    <group>
+      {TREASURE_POSITIONS.map(([x, z, rot], i) => {
+        const yBase = sandHeightAt(x, z);
         return (
-          <group key={i} position={[vine.x, vine.baseY, vine.z]}>
-            {Array.from({ length: vine.segments }).map((_, j) => {
-              const y = j * segmentHeight;
-              const wobbleX = Math.sin(i + j * 0.8) * 0.15;
-              const wobbleZ = Math.cos(i + j * 0.6) * 0.12;
-              const thickness = 0.25 - j * 0.025;
-              
+          <group key={i} position={[x, yBase, z]} rotation={[0, rot + i * 1.2, 0]}>
+            <mesh position={[0, 0.45, 0]}>
+              <boxGeometry args={[1.4, 0.8, 0.9]} />
+              <meshStandardMaterial color="#6b4226" roughness={0.85} metalness={0.05} />
+            </mesh>
+            <mesh position={[0, 0.45, 0.46]}>
+              <boxGeometry args={[1.42, 0.82, 0.02]} />
+              <meshStandardMaterial color="#5a3820" roughness={0.9} metalness={0.02} />
+            </mesh>
+            <mesh position={[0, 0.45, -0.46]}>
+              <boxGeometry args={[1.42, 0.82, 0.02]} />
+              <meshStandardMaterial color="#5a3820" roughness={0.9} metalness={0.02} />
+            </mesh>
+            {[-0.5, 0, 0.5].map((bx, bi) => (
+              <mesh key={`band-${bi}`} position={[bx, 0.45, 0]}>
+                <boxGeometry args={[0.08, 0.84, 0.94]} />
+                <meshStandardMaterial color="#c9a84c" roughness={0.4} metalness={0.6} />
+              </mesh>
+            ))}
+            <mesh position={[0, 0.88, 0]} rotation={[-0.5 - i * 0.2, 0, 0]} scale={[1.0, 0.15, 0.9]}>
+              <boxGeometry args={[1.4, 1, 0.9]} />
+              <meshStandardMaterial color="#7a5230" roughness={0.85} metalness={0.05} />
+            </mesh>
+            <mesh position={[0, 0.92, 0]}>
+              <boxGeometry args={[0.2, 0.12, 0.15]} />
+              <meshStandardMaterial color="#d4b04f" roughness={0.3} metalness={0.7} />
+            </mesh>
+            {Array.from({ length: 8 }).map((_, ci) => {
+              const cx = (ci - 3.5) * 0.16;
+              const cz = Math.sin(ci + i) * 0.25;
               return (
-                <group key={j}>
-                  {/* Vine stem segment */}
-                  <mesh
-                    position={[wobbleX, y + segmentHeight / 2, wobbleZ]}
-                    rotation={[wobbleZ * 0.3, 0, wobbleX * 0.2]}
-                  >
-                    <cylinderGeometry args={[thickness * 0.7, thickness, segmentHeight, 6]} />
-                    <meshStandardMaterial color={vineColor} roughness={0.85} metalness={0} />
+                <mesh key={`coin-${ci}`} position={[cx, 0.85 + ci * 0.03, cz]} rotation={[Math.PI / 2 + ci * 0.15, 0, ci * 0.3]}>
+                  <cylinderGeometry args={[0.1, 0.1, 0.03, 8]} />
+                  <meshStandardMaterial color="#e8c84f" roughness={0.3} metalness={0.7} />
+                </mesh>
+              );
+            })}
+            {Array.from({ length: 5 }).map((_, gi) => (
+              <mesh key={`gem-${gi}`} position={[Math.sin(gi * 1.3) * 0.4, 0.9 + gi * 0.02, Math.cos(gi * 0.9) * 0.2]}>
+                <octahedronGeometry args={[0.08 + (gi % 3) * 0.03, 0]} />
+                <meshStandardMaterial color={gi % 3 === 0 ? "#e04040" : gi % 3 === 1 ? "#40e040" : "#4060e0"} roughness={0.2} metalness={0.3} emissive={gi % 3 === 0 ? "#e04040" : gi % 3 === 1 ? "#40e040" : "#4060e0"} emissiveIntensity={0.3} />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Sunken Anchor ── */
+function SunkenAnchor() {
+  const x = 8, z = 18;
+  const yBase = sandHeightAt(x, z);
+  return (
+    <group position={[x, yBase, z]} rotation={[0.15, 0.8, 0.1]}>
+      <mesh position={[0, 1.5, 0]}>
+        <cylinderGeometry args={[0.1, 0.1, 3.0, 8]} />
+        <meshStandardMaterial color="#4a4a4a" roughness={0.7} metalness={0.5} />
+      </mesh>
+      <mesh position={[0, 2.9, 0]}>
+        <torusGeometry args={[0.3, 0.08, 8, 16]} />
+        <meshStandardMaterial color="#4a4a4a" roughness={0.7} metalness={0.5} />
+      </mesh>
+      <mesh position={[0, 0.15, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.08, 0.08, 2.0, 8]} />
+        <meshStandardMaterial color="#4a4a4a" roughness={0.7} metalness={0.5} />
+      </mesh>
+      {[-1, 1].map((dir) => (
+        <group key={dir}>
+          <mesh position={[dir * 0.9, 0.15, 0]} rotation={[0, 0, dir * 0.6]}>
+            <cylinderGeometry args={[0.07, 0.07, 0.8, 6]} />
+            <meshStandardMaterial color="#4a4a4a" roughness={0.7} metalness={0.5} />
+          </mesh>
+          <mesh position={[dir * 1.15, -0.15, 0]}>
+            <coneGeometry args={[0.14, 0.3, 5]} />
+            <meshStandardMaterial color="#4a4a4a" roughness={0.7} metalness={0.5} />
+          </mesh>
+        </group>
+      ))}
+      {Array.from({ length: 6 }).map((_, ci) => (
+        <mesh key={`ch-${ci}`} position={[Math.sin(ci * 0.8) * 0.15, 3.1 + ci * 0.3, Math.cos(ci * 0.6) * 0.15]} rotation={[ci * 0.4, 0, ci * 0.3]}>
+          <torusGeometry args={[0.12, 0.04, 6, 8]} />
+          <meshStandardMaterial color="#5a5a5a" roughness={0.6} metalness={0.5} />
+        </mesh>
+      ))}
+      {Array.from({ length: 4 }).map((_, ri) => (
+        <mesh key={`rust-${ri}`} position={[Math.sin(ri * 1.5) * 0.12, 0.5 + ri * 0.6, 0.1]}>
+          <sphereGeometry args={[0.06 + ri * 0.02, 5, 4]} />
+          <meshStandardMaterial color="#8a4a20" roughness={0.95} metalness={0.1} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/* ── Starfish ── */
+const STARFISH_POSITIONS: Array<[number, number, number]> = [
+  [-10, -8, 0.3], [6, 14, 1.2], [-20, 2, 0.7], [14, -6, 2.1], [0, -18, 0.5],
+  [20, 10, 1.8], [-8, 16, 0.1], [-18, -14, 1.5],
+];
+
+function StarfishArm({ angle, length }: { angle: number; length: number }) {
+  return (
+    <group rotation={[0, 0, angle]}>
+      <mesh position={[length * 0.5, 0, 0]} scale={[1, 0.3, 1]}>
+        <coneGeometry args={[0.12, length, 4]} />
+        <meshStandardMaterial color="#d06030" roughness={0.75} metalness={0.05} />
+      </mesh>
+      {Array.from({ length: 3 }).map((_, ti) => (
+        <mesh key={ti} position={[length * (0.2 + ti * 0.25), 0.03, 0]}>
+          <sphereGeometry args={[0.04, 4, 3]} />
+          <meshStandardMaterial color="#f0a080" roughness={0.6} metalness={0} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Starfish() {
+  return (
+    <group>
+      {STARFISH_POSITIONS.map(([x, z, rot], i) => {
+        const yBase = sandHeightAt(x, z);
+        const armLen = 0.35 + (i % 3) * 0.08;
+        return (
+          <group key={i} position={[x, yBase + 0.05, z]} rotation={[-Math.PI / 2, 0, rot]}>
+            <mesh>
+              <sphereGeometry args={[0.15, 6, 5]} />
+              <meshStandardMaterial color="#c85828" roughness={0.75} metalness={0.05} />
+            </mesh>
+            {Array.from({ length: 5 }).map((_, ai) => (
+              <StarfishArm key={ai} angle={(ai / 5) * Math.PI * 2} length={armLen} />
+            ))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Sea Urchins ── */
+const URCHIN_POSITIONS: Array<[number, number]> = [
+  [-4, -12], [10, 6], [-14, -2], [20, -10], [2, 16], [-20, 14],
+];
+
+function SeaUrchins() {
+  const URCHIN_COLORS = ["#2a1a3a", "#1a2a1a", "#3a1a2a", "#1a1a2a"];
+  return (
+    <group>
+      {URCHIN_POSITIONS.map(([x, z], i) => {
+        const yBase = sandHeightAt(x, z);
+        const radius = 0.25 + (i % 3) * 0.08;
+        const spineCount = 20 + (i % 5) * 4;
+        return (
+          <group key={i} position={[x, yBase + radius, z]}>
+            <mesh>
+              <sphereGeometry args={[radius, 10, 8]} />
+              <meshStandardMaterial color={URCHIN_COLORS[i % URCHIN_COLORS.length]} roughness={0.85} metalness={0.05} />
+            </mesh>
+            {Array.from({ length: spineCount }).map((_, si) => {
+              const phi = Math.acos(1 - 2 * (si + 0.5) / spineCount);
+              const theta = Math.PI * (1 + Math.sqrt(5)) * si;
+              const nx = Math.sin(phi) * Math.cos(theta);
+              const ny = Math.sin(phi) * Math.sin(theta);
+              const nz = Math.cos(phi);
+              const spineLen = radius * (1.2 + (si % 4) * 0.3);
+              return (
+                <mesh key={si} position={[nx * radius, nz * radius, ny * radius]} rotation={[Math.atan2(Math.sqrt(nx * nx + ny * ny), nz), 0, Math.atan2(ny, nx)]}>
+                  <cylinderGeometry args={[0.008, 0.02, spineLen, 3]} />
+                  <meshStandardMaterial color={si % 2 === 0 ? "#1a0a2a" : "#2a1a3a"} roughness={0.8} metalness={0.1} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Animated Jellyfish ── */
+const JELLYFISH_POSITIONS: Array<[number, number, number]> = [
+  [-12, 4, 6], [14, -8, 8], [0, 12, 5], [-18, -6, 7], [20, 6, 9],
+];
+
+function Jellyfish() {
+  const jellyRefs = useRef<THREE.Group[]>([]);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    jellyRefs.current.forEach((group, idx) => {
+      if (!group) return;
+      const base = JELLYFISH_POSITIONS[idx];
+      group.position.y = base[2] + Math.sin(t * 0.4 + idx * 1.5) * 1.5;
+      group.position.x = base[0] + Math.sin(t * 0.2 + idx * 2.3) * 0.8;
+      group.position.z = base[1] + Math.cos(t * 0.25 + idx * 1.8) * 0.6;
+      group.rotation.y = Math.sin(t * 0.15 + idx) * 0.3;
+      const pulse = 1 + Math.sin(t * 2 + idx * 1.2) * 0.08;
+      group.scale.set(pulse, 1 / pulse, pulse);
+    });
+  });
+
+  const JELLY_COLORS = ["#e8a0d8", "#a0d8e8", "#d8e8a0", "#a0e8c0", "#d8a0e8"];
+  return (
+    <group>
+      {JELLYFISH_POSITIONS.map((pos, i) => {
+        const bellR = 0.6 + (i % 3) * 0.15;
+        const tentCount = 8 + (i % 4) * 2;
+        const color = JELLY_COLORS[i % JELLY_COLORS.length];
+        return (
+          <group key={i} ref={(el) => { if (el) jellyRefs.current[i] = el; }} position={[pos[0], pos[2], pos[1]]}>
+            <mesh scale={[1, 0.55, 1]}>
+              <sphereGeometry args={[bellR, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <meshStandardMaterial color={color} roughness={0.3} metalness={0} transparent opacity={0.65} side={THREE.DoubleSide} />
+            </mesh>
+            <mesh scale={[0.85, 0.45, 0.85]}>
+              <sphereGeometry args={[bellR, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+              <meshStandardMaterial color={color} roughness={0.4} metalness={0} transparent opacity={0.4} side={THREE.DoubleSide} />
+            </mesh>
+            {Array.from({ length: 8 }).map((_, ri) => {
+              const angle = (ri / 8) * Math.PI * 2;
+              return (
+                <mesh key={`r-${ri}`} position={[Math.cos(angle) * bellR * 0.8, -0.05, Math.sin(angle) * bellR * 0.8]}>
+                  <sphereGeometry args={[0.06, 5, 4]} />
+                  <meshStandardMaterial color={color} roughness={0.3} metalness={0} emissive={color} emissiveIntensity={0.4} transparent opacity={0.8} />
+                </mesh>
+              );
+            })}
+            {Array.from({ length: tentCount }).map((_, ti) => {
+              const angle = (ti / tentCount) * Math.PI * 2;
+              const r = bellR * (0.5 + (ti % 3) * 0.15);
+              const tentLen = 1.5 + (ti % 4) * 0.5;
+              return (
+                <mesh key={`t-${ti}`} position={[Math.cos(angle) * r, -tentLen * 0.5, Math.sin(angle) * r]}>
+                  <cylinderGeometry args={[0.015, 0.03, tentLen, 4]} />
+                  <meshStandardMaterial color={color} roughness={0.4} metalness={0} transparent opacity={0.5} />
+                </mesh>
+              );
+            })}
+            <pointLight color={color} intensity={0.3} distance={3} decay={2} position={[0, -0.1, 0]} />
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Marimo Moss Balls ── */
+const MARIMO_POSITIONS: Array<[number, number, number]> = [
+  [-6, 4, 0.5], [8, -10, 0.45], [-14, -8, 0.55], [16, 12, 0.4], [0, -6, 0.48],
+  [-20, 0, 0.42], [22, -2, 0.52], [-10, 14, 0.38],
+];
+
+function MarimoMossBalls() {
+  return (
+    <group>
+      {MARIMO_POSITIONS.map(([x, z, radius], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase + radius, z]}>
+            <mesh>
+              <sphereGeometry args={[radius, 12, 10]} />
+              <meshStandardMaterial color="#3a6a3a" roughness={0.95} metalness={0} />
+            </mesh>
+            {Array.from({ length: 30 }).map((_, fi) => {
+              const phi = Math.acos(1 - 2 * (fi + 0.5) / 30);
+              const theta = Math.PI * (1 + Math.sqrt(5)) * fi;
+              const nx = Math.sin(phi) * Math.cos(theta) * radius;
+              const ny = Math.cos(phi) * radius;
+              const nz = Math.sin(phi) * Math.sin(theta) * radius;
+              return (
+                <mesh key={fi} position={[nx, ny, nz]} rotation={[phi, theta, 0]}>
+                  <planeGeometry args={[0.08, 0.14 + (fi % 4) * 0.03]} />
+                  <meshStandardMaterial color={fi % 3 === 0 ? "#2a5a2a" : fi % 3 === 1 ? "#4a7a4a" : "#3a6a3a"} roughness={0.9} metalness={0} side={THREE.DoubleSide} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Brain Coral & Mushroom Coral ── */
+const BRAIN_CORAL_POSITIONS: Array<[number, number, number]> = [
+  [-8, 8, 0.7], [12, -4, 0.6], [2, 14, 0.55], [-18, -12, 0.65],
+];
+const MUSHROOM_CORAL_POSITIONS: Array<[number, number, number]> = [
+  [6, -16, 0.5], [-12, 10, 0.55], [18, 8, 0.45], [-4, -14, 0.5],
+];
+
+function BrainCoral() {
+  return (
+    <group>
+      {BRAIN_CORAL_POSITIONS.map(([x, z, radius], i) => {
+        const yBase = sandHeightAt(x, z);
+        const grooveCount = 12 + (i % 4) * 2;
+        return (
+          <group key={i} position={[x, yBase + radius * 0.6, z]}>
+            <mesh scale={[1, 0.65, 1]}>
+              <sphereGeometry args={[radius, 16, 12]} />
+              <meshStandardMaterial color="#c8988a" roughness={0.8} metalness={0.03} />
+            </mesh>
+            {Array.from({ length: grooveCount }).map((_, gi) => {
+              const angle = (gi / grooveCount) * Math.PI * 2;
+              const r = radius * (0.3 + (gi % 3) * 0.2);
+              const arcLen = radius * 0.8;
+              const curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(Math.cos(angle) * r, radius * 0.2, Math.sin(angle) * r),
+                new THREE.Vector3(Math.cos(angle + 0.3) * r * 1.1, radius * 0.35, Math.sin(angle + 0.3) * r * 1.1),
+                new THREE.Vector3(Math.cos(angle + 0.6) * r * 0.9, radius * 0.15, Math.sin(angle + 0.6) * r * 0.9),
+              ]);
+              return (
+                <mesh key={gi}>
+                  <tubeGeometry args={[curve, 8, 0.03, 4, false]} />
+                  <meshStandardMaterial color="#a07060" roughness={0.85} metalness={0} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+function MushroomCoral() {
+  return (
+    <group>
+      {MUSHROOM_CORAL_POSITIONS.map(([x, z, radius], i) => {
+        const yBase = sandHeightAt(x, z);
+        return (
+          <group key={i} position={[x, yBase, z]}>
+            <mesh position={[0, 0.3, 0]}>
+              <cylinderGeometry args={[0.12, 0.18, 0.6, 6]} />
+              <meshStandardMaterial color="#8a7a68" roughness={0.9} metalness={0} />
+            </mesh>
+            <mesh position={[0, 0.65, 0]} scale={[1, 0.3, 1]}>
+              <sphereGeometry args={[radius, 14, 10]} />
+              <meshStandardMaterial color={i % 2 === 0 ? "#d07868" : "#c89080"} roughness={0.75} metalness={0.02} />
+            </mesh>
+            {Array.from({ length: 12 }).map((_, ri) => {
+              const angle = (ri / 12) * Math.PI * 2;
+              return (
+                <mesh key={ri} position={[Math.cos(angle) * radius * 0.7, 0.65, Math.sin(angle) * radius * 0.7]} rotation={[0, 0, angle]}>
+                  <boxGeometry args={[0.04, 0.01, radius * 0.8]} />
+                  <meshStandardMaterial color="#b08878" roughness={0.8} metalness={0} />
+                </mesh>
+              );
+            })}
+            {Array.from({ length: 6 }).map((_, di) => {
+              const angle = (di / 6) * Math.PI * 2 + i;
+              const r = radius * 0.4;
+              return (
+                <mesh key={`d-${di}`} position={[Math.cos(angle) * r, 0.68, Math.sin(angle) * r]}>
+                  <sphereGeometry args={[0.04, 5, 4]} />
+                  <meshStandardMaterial color="#f0c0b0" roughness={0.5} metalness={0} />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Sunken Ruins ── */
+function SunkenRuins() {
+  const ruins: Array<{ x: number; z: number; type: string; rot: number }> = [
+    { x: -22, z: -16, type: "column", rot: 0.2 },
+    { x: -20, z: -18, type: "block", rot: 0.5 },
+    { x: 22, z: 16, type: "column", rot: -0.3 },
+    { x: 20, z: 14, type: "block", rot: 0.8 },
+    { x: 0, z: 20, type: "column", rot: 0.1 },
+  ];
+  return (
+    <group>
+      {ruins.map((r, i) => {
+        const yBase = sandHeightAt(r.x, r.z);
+        if (r.type === "column") {
+          const colH = 2.5 + (i % 3) * 0.8;
+          const tilt = 0.15 + (i % 2) * 0.1;
+          return (
+            <group key={i} position={[r.x, yBase, r.z]} rotation={[tilt, r.rot, tilt * 0.5]}>
+              <mesh position={[0, colH / 2, 0]}>
+                <cylinderGeometry args={[0.35, 0.4, colH, 8]} />
+                <meshStandardMaterial color="#b0a898" roughness={0.85} metalness={0.02} />
+              </mesh>
+              {Array.from({ length: 6 }).map((_, fi) => (
+                <mesh key={fi} position={[0, fi * (colH / 6), 0]} rotation={[0, fi * 0.5, 0]}>
+                  <torusGeometry args={[0.38, 0.04, 6, 12]} />
+                  <meshStandardMaterial color="#a09888" roughness={0.88} metalness={0.02} />
+                </mesh>
+              ))}
+              <mesh position={[0, colH + 0.1, 0]}>
+                <boxGeometry args={[0.9, 0.15, 0.9]} />
+                <meshStandardMaterial color="#c0b8a8" roughness={0.85} metalness={0.02} />
+              </mesh>
+              <mesh position={[0, 0.08, 0]}>
+                <boxGeometry args={[0.9, 0.15, 0.9]} />
+                <meshStandardMaterial color="#c0b8a8" roughness={0.85} metalness={0.02} />
+              </mesh>
+              {Array.from({ length: 3 }).map((_, mi) => (
+                <mesh key={`m-${mi}`} position={[Math.sin(mi + i) * 0.25, colH * (0.3 + mi * 0.2), 0.3]}>
+                  <sphereGeometry args={[0.08, 5, 4]} />
+                  <meshStandardMaterial color="#4a6a4a" roughness={0.95} metalness={0} />
+                </mesh>
+              ))}
+            </group>
+          );
+        }
+        return (
+          <group key={i} position={[r.x, yBase, r.z]} rotation={[0.05, r.rot, 0.08]}>
+            <mesh position={[0, 0.35, 0]}>
+              <boxGeometry args={[1.2, 0.7, 0.8]} />
+              <meshStandardMaterial color="#a09888" roughness={0.88} metalness={0.02} flatShading />
+            </mesh>
+            <mesh position={[0.15, 0.75, 0.1]} rotation={[0.1, 0.3, 0.15]}>
+              <boxGeometry args={[0.8, 0.4, 0.6]} />
+              <meshStandardMaterial color="#b0a898" roughness={0.88} metalness={0.02} flatShading />
+            </mesh>
+            {Array.from({ length: 4 }).map((_, ci) => (
+              <mesh key={ci} position={[Math.sin(ci * 1.5 + i) * 0.5, 0.08, Math.cos(ci + i) * 0.3]}>
+                <dodecahedronGeometry args={[0.15 + ci * 0.03, 0]} />
+                <meshStandardMaterial color="#b0a898" roughness={0.92} metalness={0.02} flatShading />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Clam With Pearl ── */
+const CLAM_POSITIONS: Array<[number, number, number]> = [
+  [-2, -10, 0.6], [16, 6, 1.4], [-16, -4, 2.2],
+];
+
+function ClamWithPearl() {
+  return (
+    <group>
+      {CLAM_POSITIONS.map(([x, z, rot], i) => {
+        const yBase = sandHeightAt(x, z);
+        const clamSize = 0.5 + (i % 3) * 0.1;
+        return (
+          <group key={i} position={[x, yBase + 0.05, z]} rotation={[0, rot, 0]}>
+            <mesh position={[0, 0, 0]} rotation={[0.1, 0, 0]} scale={[1, 0.25, 1]}>
+              <sphereGeometry args={[clamSize, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+              <meshStandardMaterial color="#c8b8a0" roughness={0.7} metalness={0.08} />
+            </mesh>
+            <mesh position={[0, 0.08, 0]} rotation={[-0.6 - (i % 2) * 0.3, 0, 0]} scale={[1, 0.25, 1]}>
+              <sphereGeometry args={[clamSize, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+              <meshStandardMaterial color="#d0c0a8" roughness={0.7} metalness={0.08} />
+            </mesh>
+            {Array.from({ length: 8 }).map((_, ri) => {
+              const angle = (ri / 8) * Math.PI;
+              return (
+                <mesh key={ri} position={[0, 0.04, 0]} rotation={[0, angle, 0]}>
+                  <boxGeometry args={[clamSize * 2, 0.01, 0.015]} />
+                  <meshStandardMaterial color="#b8a890" roughness={0.75} metalness={0.05} />
+                </mesh>
+              );
+            })}
+            <mesh position={[0, 0.12, 0]}>
+              <sphereGeometry args={[clamSize * 0.22, 10, 8]} />
+              <meshStandardMaterial color="#f0e8e0" roughness={0.2} metalness={0.3} emissive="#f0e8e0" emissiveIntensity={0.25} />
+            </mesh>
+            <pointLight color="#f8f0e8" intensity={0.15} distance={2} decay={2} position={[0, 0.15, 0]} />
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Crystal Formations ── */
+const CRYSTAL_POSITIONS: Array<[number, number, number]> = [
+  [-18, 8, 0.8], [14, -16, 1.2], [4, -4, 0.4], [-10, 16, 1.6],
+];
+
+function CrystalFormations() {
+  const CRYSTAL_COLORS = ["#60a0e0", "#80c0f0", "#a0d8f8", "#5088c8", "#70b0e8"];
+  return (
+    <group>
+      {CRYSTAL_POSITIONS.map(([x, z, rot], i) => {
+        const yBase = sandHeightAt(x, z);
+        const crystalCount = 4 + (i % 3) * 2;
+        return (
+          <group key={i} position={[x, yBase, z]} rotation={[0, rot, 0]}>
+            <mesh position={[0, 0.15, 0]}>
+              <dodecahedronGeometry args={[0.4, 1]} />
+              <meshStandardMaterial color="#5a5a6a" roughness={0.9} metalness={0.05} flatShading />
+            </mesh>
+            {Array.from({ length: crystalCount }).map((_, ci) => {
+              const angle = (ci / crystalCount) * Math.PI * 2 + i * 0.5;
+              const dist = 0.15 + (ci % 3) * 0.1;
+              const h = 0.6 + (ci % 4) * 0.3;
+              const w = 0.08 + (ci % 3) * 0.03;
+              const tilt = 0.15 + (ci % 2) * 0.1;
+              const color = CRYSTAL_COLORS[ci % CRYSTAL_COLORS.length];
+              return (
+                <group key={`c-${ci}`}>
+                  <mesh position={[Math.cos(angle) * dist, h * 0.5 + 0.1, Math.sin(angle) * dist]} rotation={[Math.cos(angle) * tilt, 0, Math.sin(angle) * tilt]}>
+                    <octahedronGeometry args={[w, 0]} />
+                    <meshStandardMaterial color={color} roughness={0.15} metalness={0.2} transparent opacity={0.8} />
                   </mesh>
-                  
-                  {/* Leaves along the vine */}
-                  {j > 0 && j < vine.segments - 1 && (
-                    <>
-                      <mesh
-                        position={[wobbleX + 0.4, y + 1, wobbleZ]}
-                        rotation={[0.2, i * 0.5 + j, 0.6]}
-                      >
-                        <planeGeometry args={[1.2, 0.5]} />
-                        <meshStandardMaterial
-                          color={leafColor}
-                          roughness={0.8}
-                          metalness={0}
-                          side={THREE.DoubleSide}
-                        />
+                  <mesh position={[Math.cos(angle) * dist, h * 0.5 + 0.1, Math.sin(angle) * dist]} rotation={[Math.cos(angle) * tilt, 0, Math.sin(angle) * tilt]} scale={[0.7, h / (w * 2), 0.7]}>
+                    <octahedronGeometry args={[w, 0]} />
+                    <meshStandardMaterial color={color} roughness={0.1} metalness={0.15} transparent opacity={0.6} emissive={color} emissiveIntensity={0.35} />
+                  </mesh>
+                </group>
+              );
+            })}
+            <pointLight color="#80c0f0" intensity={0.25} distance={3} decay={2} position={[0, 0.5, 0]} />
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Sand Ripples (floor detail) ── */
+function SandRipples() {
+  const rippleCount = 20;
+  return (
+    <group>
+      {Array.from({ length: rippleCount }).map((_, i) => {
+        const x = -20 + (i % 5) * 10 + Math.sin(i * 2.3) * 3;
+        const z = -18 + Math.floor(i / 5) * 9 + Math.cos(i * 1.7) * 3;
+        const yBase = sandHeightAt(x, z);
+        const len = 2 + (i % 4) * 0.8;
+        return (
+          <mesh key={i} position={[x, yBase + 0.01, z]} rotation={[-Math.PI / 2, 0, i * 0.7]}>
+            <planeGeometry args={[len, 0.08]} />
+            <meshStandardMaterial color="#c8b898" roughness={0.95} metalness={0} transparent opacity={0.4} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Tube Worm Clusters ── */
+const TUBE_WORM_POSITIONS: Array<[number, number]> = [
+  [-6, -6], [10, 10], [-16, 14], [18, -12],
+];
+
+function TubeWormClusters() {
+  const WORM_COLORS = ["#e04040", "#e06040", "#d03030", "#f05050", "#c82828"];
+  return (
+    <group>
+      {TUBE_WORM_POSITIONS.map(([x, z], i) => {
+        const yBase = sandHeightAt(x, z);
+        const tubeCount = 6 + (i % 4) * 2;
+        return (
+          <group key={i} position={[x, yBase, z]}>
+            {Array.from({ length: tubeCount }).map((_, ti) => {
+              const angle = (ti / tubeCount) * Math.PI * 2 + i;
+              const dist = 0.15 + (ti % 3) * 0.08;
+              const h = 0.5 + (ti % 4) * 0.2;
+              return (
+                <group key={ti} position={[Math.cos(angle) * dist, 0, Math.sin(angle) * dist]}>
+                  <mesh position={[0, h / 2, 0]}>
+                    <cylinderGeometry args={[0.04, 0.06, h, 5]} />
+                    <meshStandardMaterial color="#a09080" roughness={0.9} metalness={0.02} />
+                  </mesh>
+                  {Array.from({ length: 5 }).map((_, fi) => {
+                    const fAngle = (fi / 5) * Math.PI * 2;
+                    return (
+                      <mesh key={fi} position={[Math.cos(fAngle) * 0.06, h, Math.sin(fAngle) * 0.06]} rotation={[Math.cos(fAngle) * 0.5, 0, Math.sin(fAngle) * 0.5]}>
+                        <cylinderGeometry args={[0.005, 0.015, 0.15, 3]} />
+                        <meshStandardMaterial color={WORM_COLORS[(ti + fi) % WORM_COLORS.length]} roughness={0.6} metalness={0} />
                       </mesh>
-                      <mesh
-                        position={[wobbleX - 0.3, y + 2.5, wobbleZ + 0.2]}
-                        rotation={[-0.15, i * 0.3 + j * 0.7, -0.5]}
-                      >
-                        <planeGeometry args={[1.0, 0.45]} />
-                        <meshStandardMaterial
-                          color={leafColor}
-                          roughness={0.8}
-                          metalness={0}
-                          side={THREE.DoubleSide}
-                        />
-                      </mesh>
-                    </>
-                  )}
+                    );
+                  })}
                 </group>
               );
             })}
