@@ -10,6 +10,11 @@ Thumbs.db
 *.swp
 *.swo
 
+# Internal build plan / progress docs (not for public repo)
+Lobster Tank*.md
+\#*LOBSTER*TANK*.md
+\#*Lobster*Tank*.md
+
 # Dependencies and build (lobster-tank has its own)
 node_modules/
 lobster-tank/node_modules/

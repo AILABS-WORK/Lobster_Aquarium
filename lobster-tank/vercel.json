@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/auto-story",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/auto-molt",
+      "schedule": "1,31 * * * *"
+    }
+  ]
+}
